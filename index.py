@@ -71,6 +71,7 @@ def linearRegPredict(predictVal, xval, yval):
     return projected_value
 
 
+#confidence interval function
 def mean_confidence_interval(data, confidence=0.95):
     a = 1.0 * np.array(data)
     n = len(a)
@@ -131,13 +132,35 @@ while True:
 
             # ------ Load Player data for Model ----- #
             playerName = playerFirst + " " + playerLast
-            player_home_road = ps.home_road(player = playerName, position = pposition, season = 2022)
 
-            print(player_home_road)
             # ------ Load Opp Team Data for Model -------- #
 
-            tg.get_team_game_log(team = oppTeam, season = 2022)
-            t.home_road(team = oppTeam, season = 2022, avg = True)
+
+            opp_games = tg.get_team_game_log(team = oppTeam, season = 2022)
+            opp_splits = t.home_road(team = oppTeam, season = 2022, avg = True)
+
+            #Store Opposition Defense statistics 
+            opp_rushing_defense = opp_games.loc[:, 'opp_rush_yds'].values
+            opp_ru_defense_in_wins = opp_games[(opp_games["result"] == "W")]['opp_rush_yds'].values
+            opp_ru_defense_in_loss = opp_games[(opp_games["result"] == "L")]['opp_rush_yds'].values
+
+            rushing_sum = sum(opp_rushing_defense)
+
+            rushing_average = rushing_sum/len(opp_rushing_defense)
+
+            yval_wins = range(len(opp_ru_defense_in_wins))
+            yval_loss = range(len(opp_ru_defense_in_loss))
+            yval = range(len(opp_rushing_defense))
+            val = linReg(yval, opp_rushing_defense)[0]
+
+            defensive_ru_allowed = linearRegPredict(val, opp_rushing_defense, yval)[0][0]
+
+            print("Defensive Projection: ", defensive_ru_allowed)
+            print("Defensive Average: ", rushing_average)
+
+            #get defensive rushing projection coeff
+
+            rushing_coeff = defensive_ru_allowed/rushing_average
 
             # ---- Get ready to store historical data ---- #
             historical_rushatt = []
@@ -307,6 +330,7 @@ while True:
             rectdTrend = []
             targTrend = []
             recyrdTrend = []
+
             for game in prevGames:
 
                 totalruyards = totalruyards + game['rush_yards']
@@ -332,70 +356,71 @@ while True:
            # rutrend = linReg(yval, yardTrend)
           #  rutrend = rutrend[0]
 
+            if count > 1: 
+                #rush yards
+                val = linReg(yval, yardTrend)[0]
+                yardregression = linearRegPredict(val, yardTrend, yval)
+                yardregression = yardregression[0][0]
+                #rec yards
+                val = linReg(yvalues, recyrdTrend)[0]
+                recyardregression = linearRegPredict(val, recyrdTrend, yval)
+                recyardregression = recyardregression[0][0]
+                #recTds
+                val = linReg(yvalues, rectdTrend)[0]
+                rectdregression = linearRegPredict(val, rectdTrend, yval)
+                rectdregression = rectdregression[0][0]
+                #rushTds
+                val = linReg(yvalues, rutdTrend)[0]
+                rutdregression = linearRegPredict(val, rutdTrend, yval)
+                rutdregression =rutdregression[0][0]
+                #rushatt
+                val = linReg(yval, attTrend)[0]
+                attregression = linearRegPredict(val, attTrend, yval)
+                attregression= attregression[0][0]
+                #targets
+                val = linReg(yvalues, targTrend)[0]
+                targregression = linearRegPredict(val, targTrend, yval)
+                targregression =targregression[0][0]
 
-            #rush yards
-            val = linReg(yval, yardTrend)[0]
-            yardregression = linearRegPredict(val, yardTrend, yval)
-            yardregression = yardregression[0][0]
-            #rec yards
-            val = linReg(yvalues, recyrdTrend)[0]
-            recyardregression = linearRegPredict(val, recyrdTrend, yval)
-            recyardregression = recyardregression[0][0]
-            #recTds
-            val = linReg(yvalues, rectdTrend)[0]
-            rectdregression = linearRegPredict(val, rectdTrend, yval)
-            rectdregression = rectdregression[0][0]
-            #rushTds
-            val = linReg(yvalues, rutdTrend)[0]
-            rutdregression = linearRegPredict(val, rutdTrend, yval)
-            rutdregression =rutdregression[0][0]
-            #rushatt
-            val = linReg(yval, attTrend)[0]
-            attregression = linearRegPredict(val, attTrend, yval)
-            attregression= attregression[0][0]
-            #targets
-            val = linReg(yvalues, targTrend)[0]
-            targregression = linearRegPredict(val, targTrend, yval)
-            targregression =targregression[0][0]
+                # print(attregression)
+                # print (tdRegression)
 
-            # print(attregression)
-            # print (tdRegression)
+                # --- Calc averages from previous 4 games --- #
+                totalruyards = totalruyards/count
+                totaltds = totaltds/count
+                totalatt = totalatt/count
+                totaltarg = totaltarg/count
+                totalrecyards = totalrecyards/count
+                totalrectds = totalrectds/count
 
-            # --- Calc averages from previous 4 games --- #
-            totalruyards = totalruyards/count
-            totaltds = totaltds/count
-            totalatt = totalatt/count
-            totaltarg = totaltarg/count
-            totalrecyards = totalrecyards/count
-            totalrectds = totalrectds/count
+            if count > 1:
+                # ----- Previous Similar Games ----- #
+                avgs = { "recent_projection": {
+                    "rush_attempts": totalatt,
+                    "rush_yards": totalruyards,
+                    "targets": totaltarg,
+                    "rec_yards": totalrecyards,
+                    "rush_tds": totaltds,
+                    "rec_tds": totalrectds,
+                    "weight" : 0.15
+                    },
+                }
 
-            # ----- Previous Similar Games ----- #
-            avgs = { "recent_projection": {
-                "rush_attempts": totalatt,
-                "rush_yards": totalruyards,
-                "targets": totaltarg,
-                "rec_yards": totalrecyards,
-                "rush_tds": totaltds,
-                "rec_tds": totalrectds,
-                "weight" : 0.15
-                },
-            }
+                # ------ Projection from previous games ----- #
+                reg_avgs = { "recent_projection": {
+                    "rush_attempts": attregression,
+                    "rush_yards": yardregression,
+                    "targets": targregression,
+                    "rec_yards": recyardregression,
+                    "rush_tds": rutdregression,
+                    "rec_tds": rectdregression,
+                    "weight" : 0.4
+                    },
+                }
 
-            # ------ Projection from previous games ----- #
-            reg_avgs = { "recent_projection": {
-                "rush_attempts": attregression,
-                "rush_yards": yardregression,
-                "targets": targregression,
-                "rec_yards": recyardregression,
-                "rush_tds": rutdregression,
-                "rec_tds": rectdregression,
-                "weight" : 0.4
-                },
-            }
-
-            # ------ Historical Projections -------- #
-            hist_avg = { 
-                "recent_projection": {
+                # ------ Historical Projections -------- #
+                hist_avg = { 
+                    "recent_projection": {
                     "rush_attempts": historical_ruatt_proj,
                     "rush_yards": historical_ruyards_proj,
                     "targets": historical_targets_proj,
@@ -403,12 +428,12 @@ while True:
                     "rush_tds": historical_rutds_proj,
                     "rec_tds": historical_rectds_proj,
                     "weight" : 0.2
-                },
-            }
+                    },
+                }
             
-             # ------ Recent Game Projections -------- #
-            recent_avg = { 
-                "recent_projection": {
+                # ------ Recent Game Projections -------- #
+                recent_avg = { 
+                    "recent_projection": {
                     "rush_attempts": recent_games_rushatt_proj,
                     "rush_yards": recent_games_rushyrds_proj,
                     "targets": recent_games_targets_proj,
@@ -416,8 +441,59 @@ while True:
                     "rush_tds": recent_games_rushtds_proj,
                     "rec_tds": recent_games_rectds_proj,
                     "weight" : 0.25
-                },
-            }
+                    },
+                }
+            else:
+                # ----- Previous Similar Games ----- #
+                avgs = { "recent_projection": {
+                    "rush_attempts": 0,
+                    "rush_yards": 0,
+                    "targets": 0,
+                    "rec_yards": 0,
+                    "rush_tds": 0,
+                    "rec_tds": 0,
+                    "weight" : 0
+                    },
+                }
+
+                # ------ Projection from previous games ----- #
+                reg_avgs = { "recent_projection": {
+                    "rush_attempts": 0,
+                    "rush_yards": 0,
+                    "targets": 0,
+                    "rec_yards": 0,
+                    "rush_tds": 0,
+                    "rec_tds": 0,
+                    "weight" : 0
+                    },
+                }
+
+                # ------ Historical Projections -------- #
+                hist_avg = { 
+                    "recent_projection": {
+                    "rush_attempts": historical_ruatt_proj,
+                    "rush_yards": historical_ruyards_proj,
+                    "targets": historical_targets_proj,
+                    "rec_yards": historical_recyards_proj,
+                    "rush_tds": historical_rutds_proj,
+                    "rec_tds": historical_rectds_proj,
+                    "weight" : 0.5
+                    },
+                }
+            
+                # ------ Recent Game Projections -------- #
+                recent_avg = { 
+                    "recent_projection": {
+                    "rush_attempts": recent_games_rushatt_proj,
+                    "rush_yards": recent_games_rushyrds_proj,
+                    "targets": recent_games_targets_proj,
+                    "rec_yards": recent_games_recyrds_proj,
+                    "rush_tds": recent_games_rushtds_proj,
+                    "rec_tds": recent_games_rectds_proj,
+                    "weight" : 0.5
+                    },
+                }
+
 
             # -- Calculate regression projections from prev games data -- #
 
@@ -431,10 +507,10 @@ while True:
 
             #----rush attempts----#
             rush_att_full = 0
-            rush_att_full = rush_att_full + (recent_avg['recent_projection']["rush_attempts"] *recent_avg['recent_projection']["weight"])
-            rush_att_full = rush_att_full + (hist_avg['recent_projection']["rush_attempts"] *hist_avg['recent_projection']["weight"])
-            rush_att_full = rush_att_full + (reg_avgs['recent_projection']["rush_attempts"] *reg_avgs['recent_projection']["weight"])
-            rush_att_full = rush_att_full + (avgs['recent_projection']["rush_attempts"] *avgs['recent_projection']["weight"])
+            rush_att_full = rush_att_full + ((recent_avg['recent_projection']["rush_attempts"] *recent_avg['recent_projection']["weight"])*rushing_coeff)
+            rush_att_full = rush_att_full + ((hist_avg['recent_projection']["rush_attempts"] *hist_avg['recent_projection']["weight"])*rushing_coeff)
+            rush_att_full = rush_att_full + ((reg_avgs['recent_projection']["rush_attempts"] *reg_avgs['recent_projection']["weight"])*rushing_coeff)
+            rush_att_full = rush_att_full + ((avgs['recent_projection']["rush_attempts"] *avgs['recent_projection']["weight"])*rushing_coeff)
 
             #----rush tds----#
             rush_tds_full = 0
@@ -445,10 +521,10 @@ while True:
 
             #----rush yds----#
             rush_yds_full = 0
-            rush_yds_full = rush_yds_full + (recent_avg['recent_projection']["rush_yards"] *recent_avg['recent_projection']["weight"])
-            rush_yds_full = rush_yds_full + (hist_avg['recent_projection']["rush_yards"] *hist_avg['recent_projection']["weight"])
-            rush_yds_full = rush_yds_full + (reg_avgs['recent_projection']["rush_yards"] *reg_avgs['recent_projection']["weight"])
-            rush_yds_full = rush_yds_full + (avgs['recent_projection']["rush_yards"] *avgs['recent_projection']["weight"])
+            rush_yds_full = rush_yds_full + ((recent_avg['recent_projection']["rush_yards"] *recent_avg['recent_projection']["weight"]) * rushing_coeff)
+            rush_yds_full = rush_yds_full + ((hist_avg['recent_projection']["rush_yards"] *hist_avg['recent_projection']["weight"]) * rushing_coeff)
+            rush_yds_full = rush_yds_full + ((reg_avgs['recent_projection']["rush_yards"] *reg_avgs['recent_projection']["weight"]) * rushing_coeff)
+            rush_yds_full = rush_yds_full + ((avgs['recent_projection']["rush_yards"] *avgs['recent_projection']["weight"])*rushing_coeff)
 
             #---- targets ----#
             tgt_full = 0
@@ -480,15 +556,20 @@ while True:
             output = pd.DataFrame(np.array([arr]), columns=['Rush Attempts:', 'Rush Yards:', 'Rush Tds:', "Targets", "Recieving Yards", "Rec Tds"])
 
             #Print prev game data
-            averages = "Rush Att: "+ str(totalatt) +"\n"+ "Rush Yards: "+ str(totalruyards) +"\n"+"Rush Tds: "+ str(totaltds) +"\n"+"Rec Yards: "+ str(totalrecyards) +"\n"+"Targets: "+ str(totaltarg) +"\n"+"Rec Tds: "+ str(totalrectds) +"\n"
+            if count > 1:
+                averages = "Rush Att: "+ str(totalatt) +"\n"+ "Rush Yards: "+ str(totalruyards) +"\n"+"Rush Tds: "+ str(totaltds) +"\n"+"Rec Yards: "+ str(totalrecyards) +"\n"+"Targets: "+ str(totaltarg) +"\n"+"Rec Tds: "+ str(totalrectds) +"\n"
 
-            #Print Regression Projections
-            regression = "Rush Att: " +str(attregression) + " Rush Yards: "+ str(yardregression) + " Tds: " + str(rutdregression) + " Targets: "+ str(targregression) + " Rec Yards: "+ str(recyardregression)
+                #Print Regression Projections
+                regression = "Rush Att: " +str(attregression) + " Rush Yards: "+ str(yardregression) + " Tds: " + str(rutdregression) + " Targets: "+ str(targregression) + " Rec Yards: "+ str(recyardregression)
 
-            new_rows = [[sg.Text(playerName + " Previous "+ str(count) + " " + loc + " game averages versus the "+ oppTeam)], [sg.Text(averages)],
-            [sg.Text("Regression Only Model From Previous Similar Games Projects: ")], [sg.Text(regression)], 
-            [sg.Text("Our Model Projects: ")], [sg.Text(output)]
-            ]
+                new_rows = [[sg.Text(playerName + " Previous "+ str(count) + " " + loc + " game averages versus the "+ oppTeam)], [sg.Text(averages)],
+                [sg.Text("Regression Only Model From Previous Similar Games Projects: ")], [sg.Text(regression)], 
+                [sg.Text("Our Model Projects: ")], [sg.Text(output)]
+                ]
+            else:
+                new_rows = [ 
+                [sg.Text("Our Model Projects: ")], [sg.Text(output)]
+                ]
             window.extend_layout(window, new_rows)
             window.refresh()
 
@@ -510,6 +591,34 @@ while True:
 
             tg.get_team_game_log(team = oppTeam, season = 2022)
             t.home_road(team = oppTeam, season = 2022, avg = True)
+
+            opp_games = tg.get_team_game_log(team = oppTeam, season = 2022)
+            opp_splits = t.home_road(team = oppTeam, season = 2022, avg = True)
+
+            print(opp_games)
+            #Store Opposition Defense statistics 
+            opp_rushing_defense = opp_games.loc[:, 'opp_pass_yds'].values
+            opp_ru_defense_in_wins = opp_games[(opp_games["result"] == "W")]['opp_pass_yds'].values
+            opp_ru_defense_in_loss = opp_games[(opp_games["result"] == "L")]['opp_pass_yds'].values
+
+            rushing_sum = sum(opp_rushing_defense)
+
+            rushing_average = rushing_sum/len(opp_rushing_defense)
+
+            yval_wins = range(len(opp_ru_defense_in_wins))
+            yval_loss = range(len(opp_ru_defense_in_loss))
+            yval = range(len(opp_rushing_defense))
+            val = linReg(yval, opp_rushing_defense)[0]
+
+            defensive_ru_allowed = linearRegPredict(val, opp_rushing_defense, yval)[0][0]
+
+            print("Defensive Projection: ", defensive_ru_allowed)
+            print("Defensive Average: ", rushing_average)
+
+            #get defensive rushing projection coeff
+
+            rec_coeff = defensive_ru_allowed/rushing_average
+
 
             # ---- Get ready to store historical data ---- #
             historical_rec = []
@@ -710,7 +819,7 @@ while True:
 
             # print(attregression)
             # print (tdRegression)
-            if count > 0:
+            if count > 1:
                 # --- Calc averages from previous 4 games --- #
                 totalsnap_pct = totalsnap_pct/count
                 totalrec = totalrec/count
@@ -822,31 +931,31 @@ while True:
 
             #----receptions----#
             rec_full = 0
-            rec_full = rec_full + (recent_avg['recent_projection']["rec"] *recent_avg['recent_projection']["weight"])
-            rec_full = rec_full + (hist_avg['recent_projection']["rec"] *hist_avg['recent_projection']["weight"])
-            rec_full = rec_full + (reg_avgs['recent_projection']["rec"] *reg_avgs['recent_projection']["weight"])
-            rec_full = rec_full + (avgs['recent_projection']["rec"] *avgs['recent_projection']["weight"])
+            rec_full = rec_full + ((recent_avg['recent_projection']["rec"] *recent_avg['recent_projection']["weight"])*rec_coeff)
+            rec_full = rec_full + ((hist_avg['recent_projection']["rec"] *hist_avg['recent_projection']["weight"])*rec_coeff)
+            rec_full = rec_full + ((reg_avgs['recent_projection']["rec"] *reg_avgs['recent_projection']["weight"])*rec_coeff)
+            rec_full = rec_full + ((avgs['recent_projection']["rec"] *avgs['recent_projection']["weight"])*rec_coeff)
 
             #----snap count----#
             snap_pct_full = 0
-            snap_pct_full = snap_pct_full + (recent_avg['recent_projection']["snap_pct"] *recent_avg['recent_projection']["weight"])
-            snap_pct_full = snap_pct_full + (hist_avg['recent_projection']["snap_pct"] *hist_avg['recent_projection']["weight"])
-            snap_pct_full = snap_pct_full + (reg_avgs['recent_projection']["snap_pct"] *reg_avgs['recent_projection']["weight"])
-            snap_pct_full = snap_pct_full + (avgs['recent_projection']["snap_pct"] *avgs['recent_projection']["weight"])
+            snap_pct_full = snap_pct_full + ((recent_avg['recent_projection']["snap_pct"] *recent_avg['recent_projection']["weight"])*rec_coeff)
+            snap_pct_full = snap_pct_full + ((hist_avg['recent_projection']["snap_pct"] *hist_avg['recent_projection']["weight"])*rec_coeff)
+            snap_pct_full = snap_pct_full + ((reg_avgs['recent_projection']["snap_pct"] *reg_avgs['recent_projection']["weight"])*rec_coeff)
+            snap_pct_full = snap_pct_full + ((avgs['recent_projection']["snap_pct"] *avgs['recent_projection']["weight"])*rec_coeff)
 
             #---- targets ----#
             tgt_full = 0
-            tgt_full = tgt_full + (recent_avg['recent_projection']["targets"] *recent_avg['recent_projection']["weight"])
-            tgt_full = tgt_full + (hist_avg['recent_projection']["targets"] *hist_avg['recent_projection']["weight"])
-            tgt_full = tgt_full + (reg_avgs['recent_projection']["targets"] *reg_avgs['recent_projection']["weight"])
-            tgt_full = tgt_full + (avgs['recent_projection']["targets"] *avgs['recent_projection']["weight"])
+            tgt_full = tgt_full + ((recent_avg['recent_projection']["targets"] *recent_avg['recent_projection']["weight"])*rec_coeff)
+            tgt_full = tgt_full + ((hist_avg['recent_projection']["targets"] *hist_avg['recent_projection']["weight"])*rec_coeff)
+            tgt_full = tgt_full + ((reg_avgs['recent_projection']["targets"] *reg_avgs['recent_projection']["weight"])*rec_coeff)
+            tgt_full = tgt_full + ((avgs['recent_projection']["targets"] *avgs['recent_projection']["weight"])*rec_coeff)
 
             #----rec yds----#
             rec_yds_full = 0
-            rec_yds_full = rec_yds_full + (recent_avg['recent_projection']["rec_yards"] *recent_avg['recent_projection']["weight"])
-            rec_yds_full = rec_yds_full + (hist_avg['recent_projection']["rec_yards"] *hist_avg['recent_projection']["weight"])
-            rec_yds_full = rec_yds_full + (reg_avgs['recent_projection']["rec_yards"] *reg_avgs['recent_projection']["weight"])
-            rec_yds_full = rec_yds_full + (avgs['recent_projection']["rec_yards"] *avgs['recent_projection']["weight"])
+            rec_yds_full = rec_yds_full + ((recent_avg['recent_projection']["rec_yards"] *recent_avg['recent_projection']["weight"])*rec_coeff)
+            rec_yds_full = rec_yds_full + ((hist_avg['recent_projection']["rec_yards"] *hist_avg['recent_projection']["weight"])*rec_coeff)
+            rec_yds_full = rec_yds_full + ((reg_avgs['recent_projection']["rec_yards"] *reg_avgs['recent_projection']["weight"])*rec_coeff)
+            rec_yds_full = rec_yds_full + ((avgs['recent_projection']["rec_yards"] *avgs['recent_projection']["weight"])*rec_coeff)
 
             #----rec tds----#
             rec_tds_full = 0

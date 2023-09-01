@@ -3,7 +3,7 @@
 - Single File application/Script to project NFL next game player statistics based on Recent trends in different statistics 
 - Creates a Simple GUI program that delivers projections on NFL players stats
 - Uses pro_football_reference_web_scraper, numpy, sklearn, scipy
-
+- JSON File needs to be updated weekly with FPI Chance to Win
 - requires install of pro_football_reference_web_scraper, numpy, sklearn, scipy, PySimpleGUI
 
 # Installation

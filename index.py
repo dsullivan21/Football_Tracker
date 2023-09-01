@@ -9,6 +9,7 @@ from scipy import stats
 from sklearn import datasets, svm
 from sklearn.linear_model import LinearRegression
 import PySimpleGUI as sg
+import json
 
 sg.theme('BluePurple')
 
@@ -21,6 +22,58 @@ weights = []
 
 #hold all data for projections
 allData = []
+
+#Get the FPI data for weeks W/L Chances
+with open('chancetowin.json', 'r') as f:
+    fpi_values = json.load(f)
+
+
+#Get Win/Loss Splits data projection 
+# --------------- NO REGRESSION WITH THIS ----------- #
+def win_loss_calc (team_fpi, opp_fpi, player_wl_splits, playerpos):
+
+    team_fpi = team_fpi/100
+    opp_fpi = opp_fpi/100
+
+    #return object
+    arr = {}
+    if playerpos == "RB":
+        w_ruattemps = player_wl_splits.loc['W']['rush_att']
+        w_ruyards = player_wl_splits.loc['W']['rush_yds']
+        w_rutds = player_wl_splits.loc['W']['rush_td']
+        w_targets = player_wl_splits.loc['W']['tgt']
+        w_recyards = player_wl_splits.loc['W']['rec_yds']
+        w_rectds = player_wl_splits.loc['W']['rec_td']
+
+        l_ruattemps = player_wl_splits.loc['L']['rush_att']
+        l_ruyards = player_wl_splits.loc['L']['rush_yds']
+        l_rutds = player_wl_splits.loc['L']['rush_td']
+        l_targets = player_wl_splits.loc['L']['tgt']
+        l_recyards = player_wl_splits.loc['L']['rec_yds']
+        l_rectds = player_wl_splits.loc['L']['rec_td']
+
+        totalatt = (w_ruattemps *team_fpi) + (l_ruattemps * opp_fpi)
+        totalruyards = (w_ruyards *team_fpi) + (l_ruyards * opp_fpi)
+        totaltarg = (w_targets *team_fpi) + (l_targets * opp_fpi)
+        totalrecyards = (w_recyards *team_fpi) + (l_recyards * opp_fpi)
+        totaltds = (w_rutds *team_fpi) + (l_rutds * opp_fpi)
+        totalrectds = (w_rectds *team_fpi) + (l_rectds * opp_fpi)
+
+        arr = { 
+            "recent_projection": {
+                "rush_attempts": totalatt,
+                "rush_yards": totalruyards,
+                "targets": totaltarg,
+                "rec_yards": totalrecyards,
+                "rush_tds": totaltds,
+                "rec_tds": totalrectds,
+                "weight" : 0.1
+            },
+        }
+
+
+    return arr
+
 
 #calculate regression
 # return a,b in solution to y = ax + b such that root mean square distance between trend line and original points is minimized
@@ -121,6 +174,13 @@ while True:
         oppTeamABR = values['-IN6-']
         loc = values['-IN5-']
         prevGames = []
+        allprevGames = []
+        #Save opponent Win Probability Based on FPI
+        oppWinProb = fpi_values[oppTeamABR]
+        #init team win 
+        teamWinProb = 0
+        #init Player Team
+        playerTeam = ""
 
         # ---------------------------------------- #
         # -----------------------------------------#
@@ -134,7 +194,6 @@ while True:
             playerName = playerFirst + " " + playerLast
 
             # ------ Load Opp Team Data for Model -------- #
-
 
             opp_games = tg.get_team_game_log(team = oppTeam, season = 2022)
             opp_splits = t.home_road(team = oppTeam, season = 2022, avg = True)
@@ -176,7 +235,7 @@ while True:
             
                 try:
                     player_game_log = p.get_player_game_log(player = playerName, position = pposition, season = i)
-                except:
+                except:             
                     print("player didnt return a result")
 
                 # ---- Get data from all games for recent games trend ---- #
@@ -193,6 +252,8 @@ while True:
                     historical_rushtds.extend(player_game_log.loc[:,'rush_td'].values)
                     historical_rushatt.extend(player_game_log.loc[:,'rush_att'].values)
                     historical_targets.extend( player_game_log.loc[:,'tgt'].values)
+                    # Get player team
+                    playerTeam = player_game_log.loc[1]['team']
                 else:
                     historical_rectds.extend(player_game_log.loc[:,'rec_td'].values)
                     historical_recyrds.extend(player_game_log.loc[:,'rec_yds'].values)
@@ -218,8 +279,14 @@ while True:
                         targets = valRow.iloc[0]['tgt']
                         recyards = valRow.iloc[0]['rec_yds']
                         rectds = valRow.iloc[0]['rec_td']
+                        ruattemps_all = valRow.iloc[0]['rush_att']
+                        ruyards_all = valRow.iloc[0]['rush_yds']
+                        rutds_all = valRow.iloc[0]['rush_td']
+                        targets_all = valRow.iloc[0]['tgt']
+                        recyards_all = valRow.iloc[0]['rec_yds']
+                        rectds_all = valRow.iloc[0]['rec_td']
                         isGame = True
-                else:
+                elif loc == "Home":
                     valRow = player_game_log[(player_game_log["game_location"] != "@") & (player_game_log["opp"] == oppTeamABR)]
                     print(valRow)
                     if len(valRow.index) > 0:
@@ -229,6 +296,12 @@ while True:
                         targets = valRow.iloc[0]['tgt']
                         recyards = valRow.iloc[0]['rec_yds']
                         rectds = valRow.iloc[0]['rec_td']
+                        ruattemps_all = valRow.iloc[0]['rush_att']
+                        ruyards_all = valRow.iloc[0]['rush_yds']
+                        rutds_all = valRow.iloc[0]['rush_td']
+                        targets_all = valRow.iloc[0]['tgt']
+                        recyards_all = valRow.iloc[0]['rec_yds']
+                        rectds_all = valRow.iloc[0]['rec_td']
                         isGame = True
 
                 print(isGame)
@@ -244,11 +317,29 @@ while True:
                         "year": i
                     }
                     prevGames.append(gamedata)
+                    all_pre_gamedata = {
+                        "rush_attempts": ruattemps_all,
+                        "rush_yards": ruyards_all,
+                        "rush_tds": rutds_all,
+                        "targets": targets_all,
+                        "rec_yards": recyards_all,
+                        "rec_tds": rectds_all,
+                        "year": i
+                    }
+                    allprevGames.append(all_pre_gamedata)
                 i = i -1
 
              #END WHILE#
              #---------- CALCULATE HISTORICAL MODEL ----------#
 
+            #Get Last season splits based on W/L
+            player_w_l_splits = ps.win_loss(player = playerName, position = pposition, season = 2022, avg = True)
+            teamWinProb = fpi_values[playerTeam]
+
+            #calculate W\L changes .1 WEIGHT
+            win_loss_split = win_loss_calc(teamWinProb, oppWinProb, player_w_l_splits, pposition)
+
+            print("TEAM WIN : ", teamWinProb, "OPP WIN: ", oppWinProb)
             #rush yards
             yvalues = range(len(historical_rushyrds))
             val = linReg(yvalues, historical_rushyrds)[0]
@@ -331,6 +422,98 @@ while True:
             targTrend = []
             recyrdTrend = []
 
+            #all Prev Games
+            if len(allprevGames) > 1:
+
+                for game in allprevGames:
+                    totalruyards = totalruyards + game['rush_yards']
+                    totaltds = totaltds + game['rush_tds']
+                    totalatt = totalatt + game['rush_attempts']
+                    totaltarg = totaltarg + game['targets']
+                    totalrectds = totalrectds +game['rec_tds']
+                    totalrecyards = totalrecyards + game['rec_yards']
+                    count = count + 1
+                    print("Ru Att: " , game['rush_attempts'], " Year: ", game['year'] )
+                    yval.append(count)
+                    yardTrend.append (game['rush_yards'])
+                    attTrend.append (game['rush_attempts'])
+                    rutdTrend.append(game['rush_tds'])
+                    rectdTrend.append(game['rec_tds'])
+                    targTrend.append(game['targets'])
+                    recyrdTrend.append(game['rec_yards'])
+                #rush yards
+                val = linReg(yval, yardTrend)[0]
+                yardregression = linearRegPredict(val, yardTrend, yval)
+                yardregression = yardregression[0][0]
+                #rec yards
+                val = linReg(yvalues, recyrdTrend)[0]
+                recyardregression = linearRegPredict(val, recyrdTrend, yval)
+                recyardregression = recyardregression[0][0]
+                #recTds
+                val = linReg(yvalues, rectdTrend)[0]
+                rectdregression = linearRegPredict(val, rectdTrend, yval)
+                rectdregression = rectdregression[0][0]
+                #rushTds
+                val = linReg(yvalues, rutdTrend)[0]
+                rutdregression = linearRegPredict(val, rutdTrend, yval)
+                rutdregression =rutdregression[0][0]
+                #rushatt
+                val = linReg(yval, attTrend)[0]
+                attregression = linearRegPredict(val, attTrend, yval)
+                attregression= attregression[0][0]
+                #targets
+                val = linReg(yvalues, targTrend)[0]
+                targregression = linearRegPredict(val, targTrend, yval)
+                targregression =targregression[0][0]
+
+                # print(attregression)
+                # print (tdRegression)
+
+                # --- Calc averages from previous 4 games --- #
+                totalruyards = totalruyards/count
+                totaltds = totaltds/count
+                totalatt = totalatt/count
+                totaltarg = totaltarg/count
+                totalrecyards = totalrecyards/count
+                totalrectds = totalrectds/count
+
+                all_avgs = { "recent_projection": {
+                    "rush_attempts": totalatt,
+                    "rush_yards": totalruyards,
+                    "targets": totaltarg,
+                    "rec_yards": totalrecyards,
+                    "rush_tds": totaltds,
+                    "rec_tds": totalrectds,
+                    "weight" : 0.15
+                    },
+                }
+                all_reg_avgs = { "recent_projection": {
+                    "rush_attempts": attregression,
+                    "rush_yards": yardregression,
+                    "targets": targregression,
+                    "rec_yards": recyardregression,
+                    "rush_tds": rutdregression,
+                    "rec_tds": rectdregression,
+                    "weight" : 0.15
+                    },
+                }
+
+            totalruyards = 0
+            totaltds = 0
+            totalatt = 0
+            totaltarg = 0
+            totalrecyards = 0
+            totalrectds = 0
+
+            count = 0
+            yval = []
+            yardTrend = []
+            attTrend = []
+            rutdTrend = []
+            rectdTrend = []
+            targTrend = []
+            recyrdTrend = []
+
             for game in prevGames:
 
                 totalruyards = totalruyards + game['rush_yards']
@@ -393,7 +576,7 @@ while True:
                 totalrecyards = totalrecyards/count
                 totalrectds = totalrectds/count
 
-            if count > 1:
+            if count > 1 :
                 # ----- Previous Similar Games ----- #
                 avgs = { "recent_projection": {
                     "rush_attempts": totalatt,
@@ -402,7 +585,7 @@ while True:
                     "rec_yards": totalrecyards,
                     "rush_tds": totaltds,
                     "rec_tds": totalrectds,
-                    "weight" : 0.15
+                    "weight" : 0.1
                     },
                 }
 
@@ -414,7 +597,7 @@ while True:
                     "rec_yards": recyardregression,
                     "rush_tds": rutdregression,
                     "rec_tds": rectdregression,
-                    "weight" : 0.4
+                    "weight" : 0.15
                     },
                 }
 
@@ -440,7 +623,57 @@ while True:
                     "rec_yards": recent_games_recyrds_proj,
                     "rush_tds": recent_games_rushtds_proj,
                     "rec_tds": recent_games_rectds_proj,
-                    "weight" : 0.25
+                    "weight" : 0.15
+                    },
+                }
+            elif count < 1 and len(allprevGames) > 1:
+                # ----- Previous Similar Games ----- #
+                avgs = { "recent_projection": {
+                    "rush_attempts": 0,
+                    "rush_yards": 0,
+                    "targets": 0,
+                    "rec_yards": 0,
+                    "rush_tds": 0,
+                    "rec_tds": 0,
+                    "weight" : 0
+                    },
+                }
+
+                # ------ Projection from previous games ----- #
+                reg_avgs = { "recent_projection": {
+                    "rush_attempts": 0,
+                    "rush_yards": 0,
+                    "targets": 0,
+                    "rec_yards": 0,
+                    "rush_tds": 0,
+                    "rec_tds": 0,
+                    "weight" : 0
+                    },
+                }
+
+                # ------ Historical Projections -------- #
+                hist_avg = { 
+                    "recent_projection": {
+                    "rush_attempts": historical_ruatt_proj,
+                    "rush_yards": historical_ruyards_proj,
+                    "targets": historical_targets_proj,
+                    "rec_yards": historical_recyards_proj,
+                    "rush_tds": historical_rutds_proj,
+                    "rec_tds": historical_rectds_proj,
+                    "weight" : 0.3
+                    },
+                }
+            
+                # ------ Recent Game Projections -------- #
+                recent_avg = { 
+                    "recent_projection": {
+                    "rush_attempts": recent_games_rushatt_proj,
+                    "rush_yards": recent_games_rushyrds_proj,
+                    "targets": recent_games_targets_proj,
+                    "rec_yards": recent_games_recyrds_proj,
+                    "rush_tds": recent_games_rushtds_proj,
+                    "rec_tds": recent_games_rectds_proj,
+                    "weight" : 0.3
                     },
                 }
             else:
@@ -477,7 +710,7 @@ while True:
                     "rec_yards": historical_recyards_proj,
                     "rush_tds": historical_rutds_proj,
                     "rec_tds": historical_rectds_proj,
-                    "weight" : 0.5
+                    "weight" : 0.45
                     },
                 }
             
@@ -490,10 +723,9 @@ while True:
                     "rec_yards": recent_games_recyrds_proj,
                     "rush_tds": recent_games_rushtds_proj,
                     "rec_tds": recent_games_rectds_proj,
-                    "weight" : 0.5
+                    "weight" : 0.45
                     },
                 }
-
 
             # -- Calculate regression projections from prev games data -- #
 
@@ -511,6 +743,10 @@ while True:
             rush_att_full = rush_att_full + ((hist_avg['recent_projection']["rush_attempts"] *hist_avg['recent_projection']["weight"])*rushing_coeff)
             rush_att_full = rush_att_full + ((reg_avgs['recent_projection']["rush_attempts"] *reg_avgs['recent_projection']["weight"])*rushing_coeff)
             rush_att_full = rush_att_full + ((avgs['recent_projection']["rush_attempts"] *avgs['recent_projection']["weight"])*rushing_coeff)
+            rush_att_full = rush_att_full + ((win_loss_split['recent_projection']["rush_attempts"] *win_loss_split['recent_projection']["weight"])*rushing_coeff)
+            if len(allprevGames)  > 1:
+                rush_att_full = rush_att_full + ((all_avgs['recent_projection']["rush_attempts"] *all_avgs['recent_projection']["weight"])*rushing_coeff)
+                rush_att_full = rush_att_full + ((all_reg_avgs['recent_projection']["rush_attempts"] *all_reg_avgs['recent_projection']["weight"])*rushing_coeff)
 
             #----rush tds----#
             rush_tds_full = 0
@@ -518,6 +754,10 @@ while True:
             rush_tds_full = rush_tds_full + (hist_avg['recent_projection']["rush_tds"] *hist_avg['recent_projection']["weight"])
             rush_tds_full = rush_tds_full + (reg_avgs['recent_projection']["rush_tds"] *reg_avgs['recent_projection']["weight"])
             rush_tds_full = rush_tds_full + (avgs['recent_projection']["rush_tds"] *avgs['recent_projection']["weight"])
+            rush_tds_full = rush_tds_full + ((win_loss_split['recent_projection']["rush_tds"] *win_loss_split['recent_projection']["weight"]))
+            if len(allprevGames)  > 1:
+                rush_tds_full = rush_tds_full + ((all_avgs['recent_projection']["rush_tds"] *all_avgs['recent_projection']["weight"]))
+                rush_tds_full = rush_tds_full + ((all_reg_avgs['recent_projection']["rush_tds"] *all_reg_avgs['recent_projection']["weight"]))
 
             #----rush yds----#
             rush_yds_full = 0
@@ -525,6 +765,10 @@ while True:
             rush_yds_full = rush_yds_full + ((hist_avg['recent_projection']["rush_yards"] *hist_avg['recent_projection']["weight"]) * rushing_coeff)
             rush_yds_full = rush_yds_full + ((reg_avgs['recent_projection']["rush_yards"] *reg_avgs['recent_projection']["weight"]) * rushing_coeff)
             rush_yds_full = rush_yds_full + ((avgs['recent_projection']["rush_yards"] *avgs['recent_projection']["weight"])*rushing_coeff)
+            rush_yds_full = rush_yds_full + ((win_loss_split['recent_projection']["rush_yards"] *win_loss_split['recent_projection']["weight"])*rushing_coeff)
+            if len(allprevGames) > 1:
+                rush_yds_full = rush_yds_full + ((all_avgs['recent_projection']["rush_yards"] *all_avgs['recent_projection']["weight"])*rushing_coeff)
+                rush_yds_full = rush_yds_full + ((all_reg_avgs['recent_projection']["rush_yards"] *all_reg_avgs['recent_projection']["weight"])*rushing_coeff)
 
             #---- targets ----#
             tgt_full = 0
@@ -532,6 +776,11 @@ while True:
             tgt_full = tgt_full + (hist_avg['recent_projection']["targets"] *hist_avg['recent_projection']["weight"])
             tgt_full = tgt_full + (reg_avgs['recent_projection']["targets"] *reg_avgs['recent_projection']["weight"])
             tgt_full = tgt_full + (avgs['recent_projection']["targets"] *avgs['recent_projection']["weight"])
+            tgt_full = tgt_full + ((win_loss_split['recent_projection']["targets"] *win_loss_split['recent_projection']["weight"]))
+            if len(allprevGames) > 1:
+                tgt_full = tgt_full + ((all_avgs['recent_projection']["targets"] *all_avgs['recent_projection']["weight"]))
+                tgt_full = tgt_full + ((all_reg_avgs['recent_projection']["targets"] *all_reg_avgs['recent_projection']["weight"]))
+
 
             #----rec yds----#
             rec_yds_full = 0
@@ -539,6 +788,10 @@ while True:
             rec_yds_full = rec_yds_full + (hist_avg['recent_projection']["rec_yards"] *hist_avg['recent_projection']["weight"])
             rec_yds_full = rec_yds_full + (reg_avgs['recent_projection']["rec_yards"] *reg_avgs['recent_projection']["weight"])
             rec_yds_full = rec_yds_full + (avgs['recent_projection']["rec_yards"] *avgs['recent_projection']["weight"])
+            rec_yds_full = rec_yds_full + ((win_loss_split['recent_projection']["rec_yards"] *win_loss_split['recent_projection']["weight"]))
+            if len(allprevGames) > 1:
+                rec_yds_full = rec_yds_full + ((all_avgs['recent_projection']["rec_yards"] *all_avgs['recent_projection']["weight"]))
+                rec_yds_full = rec_yds_full + ((all_reg_avgs['recent_projection']["rec_yards"] *all_reg_avgs['recent_projection']["weight"]))
 
             #----rec tds----#
             rec_tds_full = 0
@@ -546,6 +799,10 @@ while True:
             rec_tds_full = rec_tds_full + (hist_avg['recent_projection']["rec_tds"] *hist_avg['recent_projection']["weight"])
             rec_tds_full = rec_tds_full + (reg_avgs['recent_projection']["rec_tds"] *reg_avgs['recent_projection']["weight"])
             rec_tds_full = rec_tds_full + (avgs['recent_projection']["rec_tds"] *avgs['recent_projection']["weight"])
+            rec_tds_full = rec_tds_full + ((win_loss_split['recent_projection']["rec_tds"] *win_loss_split['recent_projection']["weight"]))
+            if len(allprevGames) > 1:
+                rec_tds_full = rec_tds_full + ((all_avgs['recent_projection']["rec_tds"] *all_avgs['recent_projection']["weight"]))
+                rec_tds_full = rec_tds_full + ((all_reg_avgs['recent_projection']["rec_tds"] *all_reg_avgs['recent_projection']["weight"]))
 
 
 
@@ -572,6 +829,7 @@ while True:
                 ]
             window.extend_layout(window, new_rows)
             window.refresh()
+            print(output)
 
             #window.contents_changed()    # Update the content of `sg.Column` after window.refresh()
         elif pposition == "WR" or pposition == "TE":
@@ -672,8 +930,13 @@ while True:
                         targets = valRow.iloc[0]['tgt']
                         recyards = valRow.iloc[0]['rec_yds']
                         rectds = valRow.iloc[0]['rec_td']
+                        all_rec = valRow.iloc[0]['rec']
+                        all_snap_pct = valRow.iloc[0]['snap_pct']
+                        all_targets = valRow.iloc[0]['tgt']
+                        all_recyards = valRow.iloc[0]['rec_yds']
+                        all_rectds = valRow.iloc[0]['rec_td']
                         isGame = True
-                else:
+                elif loc == "Home":
                     valRow = player_game_log[(player_game_log["game_location"] != "@") & (player_game_log["opp"] == oppTeamABR)]
                     print(valRow)
                     if len(valRow.index) > 0:
@@ -682,6 +945,11 @@ while True:
                         targets = valRow.iloc[0]['tgt']
                         recyards = valRow.iloc[0]['rec_yds']
                         rectds = valRow.iloc[0]['rec_td']
+                        all_rec = valRow.iloc[0]['rec']
+                        all_snap_pct = valRow.iloc[0]['snap_pct']
+                        all_targets = valRow.iloc[0]['tgt']
+                        all_recyards = valRow.iloc[0]['rec_yds']
+                        all_rectds = valRow.iloc[0]['rec_td']
                         isGame = True
 
                 print(isGame)
@@ -696,6 +964,16 @@ while True:
                         "year": i
                     }
                     prevGames.append(gamedata)
+                    all_pre_gamedata = {
+                        "rec": all_rec,
+                        "snap_pct": all_snap_pct,
+                        "targets": all_targets,
+                        "rec_yards": all_recyards,
+                        "rec_tds": all_rectds,
+                        "year": i
+                    }
+                    allprevGames.append(all_pre_gamedata)
+                    
                 i = i -1
 
              #END WHILE#
@@ -756,6 +1034,89 @@ while True:
             val = linReg(yvalues, recent_games_targets)[0]
             recent_games_targets_proj = linearRegPredict(val, recent_games_targets, yvalues)
             recent_games_targets_proj =recent_games_targets_proj[0][0]
+
+            #all games 
+
+            totalsnap_pct = 0
+            totaltds = 0
+            totalrec = 0
+            totaltarg = 0
+            totalrecyards = 0
+            totalrectds = 0
+
+            count = 0
+            yval = []
+            snap_pctTrend = []
+            recTrend = []
+            rutdTrend = []
+            rectdTrend = []
+            targTrend = []
+            recyrdTrend = []
+
+            if len(allprevGames) > 1:
+
+                for game in allprevGames:
+
+                    totalsnap_pct = totalsnap_pct + game['snap_pct']
+                    totalrec = totalrec + game['rec']
+                    totaltarg = totaltarg + game['targets']
+                    totalrectds = totalrectds +game['rec_tds']
+                    totalrecyards = totalrecyards + game['rec_yards']
+                    count = count + 1
+                    yval.append(count)
+                    snap_pctTrend.append (game['snap_pct'])
+                    recTrend.append (game['rec'])
+                    rectdTrend.append(game['rec_tds'])
+                    targTrend.append(game['targets'])
+                    recyrdTrend.append(game['rec_yards'])
+                #rush yards
+                val = linReg(yval, snap_pctTrend)[0]
+                snap_pctregression = linearRegPredict(val, snap_pctTrend, yval)
+                snap_pctregression = snap_pctregression[0][0]
+                #rec yards
+                val = linReg(yvalues, recyrdTrend)[0]
+                recyardregression = linearRegPredict(val, recyrdTrend, yval)
+                recyardregression = recyardregression[0][0]
+                #recTds
+                val = linReg(yvalues, rectdTrend)[0]
+                rectdregression = linearRegPredict(val, rectdTrend, yval)
+                rectdregression = rectdregression[0][0]
+                #rushatt
+                val = linReg(yval, recTrend)[0]
+                recregression = linearRegPredict(val, recTrend, yval)
+                recregression= recregression[0][0]
+                #targets
+                val = linReg(yvalues, targTrend)[0]
+                targregression = linearRegPredict(val, targTrend, yval)
+                targregression =targregression[0][0]
+                # --- Calc averages from previous 4 games --- #
+                totalsnap_pct = totalsnap_pct/count
+                totalrec = totalrec/count
+                totaltarg = totaltarg/count
+                totalrecyards = totalrecyards/count
+                totalrectds = totalrectds/count
+
+                all_avgs = { "recent_projection": {
+                    "rec": totalrec,
+                    "snap_pct": totalsnap_pct,
+                    "targets": totaltarg,
+                    "rec_yards": totalrecyards,
+                    "rec_tds": totalrectds,
+                    "weight" : 0.15
+                    },
+                }
+
+                # ------ Projection from previous games ----- #
+                allreg_avgs = { "recent_projection": {
+                    "rec": recregression,
+                    "snap_pct": snap_pctregression,
+                    "targets": targregression,
+                    "rec_yards": recyardregression,
+                    "rec_tds": rectdregression,
+                    "weight" : 0.15
+                    },
+                }
+            
 
             totalsnap_pct = 0
             totaltds = 0
@@ -845,7 +1206,7 @@ while True:
                     "targets": targregression,
                     "rec_yards": recyardregression,
                     "rec_tds": rectdregression,
-                    "weight" : 0.4
+                    "weight" : 0.1
                     },
                 }
 
@@ -872,7 +1233,53 @@ while True:
                         "weight" : 0.25
                     },
                 }
-            else:
+            elif len(allprevGames) > 1 and count < 1:
+                # ----- Previous Similar Games ----- #
+                avgs = { "recent_projection": {
+                    "rec": 0,
+                    "snap_pct": 0,
+                    "targets": 0,
+                    "rec_yards": 0,
+                    "rec_tds": 0,
+                    "weight" : 0
+                    },
+                }
+
+                # ------ Projection from previous games ----- #
+                reg_avgs = { "recent_projection": {
+                    "rec": 0,
+                    "snap_pct": 0,
+                    "targets": 0,
+                    "rec_yards": 0,
+                    "rec_tds": 0,
+                    "weight" : 0
+                    },
+                }
+
+                # ------ Historical Projections -------- #
+                hist_avg = { 
+                    "recent_projection": {
+                        "rec": historical_rec_proj,
+                        "snap_pct": historical_snap_pct_proj,
+                        "targets": historical_targets_proj,
+                        "rec_yards": historical_recyards_proj,
+                        "rec_tds": historical_rectds_proj,
+                        "weight" : 0.35
+                    },
+                }
+            
+                # ------ Recent Game Projections -------- #
+                recent_avg = { 
+                    "recent_projection": {
+                        "rec": recent_games_rec_proj,
+                        "snap_pct": recent_games_snap_pct_proj,
+                        "targets": recent_games_targets_proj,
+                        "rec_yards": recent_games_recyrds_proj,
+                        "rec_tds": recent_games_rectds_proj,
+                        "weight" : 0.35
+                    },
+                }
+            else: 
                 # ----- Previous Similar Games ----- #
                 avgs = { "recent_projection": {
                     "rec": 0,
@@ -935,6 +1342,10 @@ while True:
             rec_full = rec_full + ((hist_avg['recent_projection']["rec"] *hist_avg['recent_projection']["weight"])*rec_coeff)
             rec_full = rec_full + ((reg_avgs['recent_projection']["rec"] *reg_avgs['recent_projection']["weight"])*rec_coeff)
             rec_full = rec_full + ((avgs['recent_projection']["rec"] *avgs['recent_projection']["weight"])*rec_coeff)
+            if len(allprevGames) > 1:
+                rec_full = rec_full + ((all_avgs['recent_projection']["rec"] *all_avgs['recent_projection']["weight"])*rec_coeff)
+                rec_full = rec_full + ((allreg_avgs['recent_projection']["rec"] *allreg_avgs['recent_projection']["weight"])*rec_coeff)
+
 
             #----snap count----#
             snap_pct_full = 0
@@ -942,6 +1353,9 @@ while True:
             snap_pct_full = snap_pct_full + ((hist_avg['recent_projection']["snap_pct"] *hist_avg['recent_projection']["weight"])*rec_coeff)
             snap_pct_full = snap_pct_full + ((reg_avgs['recent_projection']["snap_pct"] *reg_avgs['recent_projection']["weight"])*rec_coeff)
             snap_pct_full = snap_pct_full + ((avgs['recent_projection']["snap_pct"] *avgs['recent_projection']["weight"])*rec_coeff)
+            if len(allprevGames) > 1:
+                snap_pct_full = snap_pct_full + ((all_avgs['recent_projection']["snap_pct"] *all_avgs['recent_projection']["weight"])*rec_coeff)
+                snap_pct_full = snap_pct_full + ((allreg_avgs['recent_projection']["snap_pct"] *allreg_avgs['recent_projection']["weight"])*rec_coeff)
 
             #---- targets ----#
             tgt_full = 0
@@ -949,6 +1363,9 @@ while True:
             tgt_full = tgt_full + ((hist_avg['recent_projection']["targets"] *hist_avg['recent_projection']["weight"])*rec_coeff)
             tgt_full = tgt_full + ((reg_avgs['recent_projection']["targets"] *reg_avgs['recent_projection']["weight"])*rec_coeff)
             tgt_full = tgt_full + ((avgs['recent_projection']["targets"] *avgs['recent_projection']["weight"])*rec_coeff)
+            if len(allprevGames) > 1:
+                tgt_full = tgt_full + ((all_avgs['recent_projection']["targets"] *all_avgs['recent_projection']["weight"])*rec_coeff)
+                tgt_full = tgt_full + ((allreg_avgs['recent_projection']["targets"] *allreg_avgs['recent_projection']["weight"])*rec_coeff)
 
             #----rec yds----#
             rec_yds_full = 0
@@ -956,6 +1373,9 @@ while True:
             rec_yds_full = rec_yds_full + ((hist_avg['recent_projection']["rec_yards"] *hist_avg['recent_projection']["weight"])*rec_coeff)
             rec_yds_full = rec_yds_full + ((reg_avgs['recent_projection']["rec_yards"] *reg_avgs['recent_projection']["weight"])*rec_coeff)
             rec_yds_full = rec_yds_full + ((avgs['recent_projection']["rec_yards"] *avgs['recent_projection']["weight"])*rec_coeff)
+            if len(allprevGames) > 1:
+                rec_yds_full = rec_yds_full + ((all_avgs['recent_projection']["rec_yards"] *all_avgs['recent_projection']["weight"])*rec_coeff)
+                rec_yds_full = rec_yds_full + ((allreg_avgs['recent_projection']["rec_yards"] *allreg_avgs['recent_projection']["weight"])*rec_coeff)
 
             #----rec tds----#
             rec_tds_full = 0
@@ -963,6 +1383,9 @@ while True:
             rec_tds_full = rec_tds_full + (hist_avg['recent_projection']["rec_tds"] *hist_avg['recent_projection']["weight"])
             rec_tds_full = rec_tds_full + (reg_avgs['recent_projection']["rec_tds"] *reg_avgs['recent_projection']["weight"])
             rec_tds_full = rec_tds_full + (avgs['recent_projection']["rec_tds"] *avgs['recent_projection']["weight"])
+            if len(allprevGames) > 1:
+                rec_tds_full = rec_tds_full + ((all_avgs['recent_projection']["rec_tds"] *all_avgs['recent_projection']["weight"])*rec_coeff)
+                rec_tds_full = rec_tds_full + ((allreg_avgs['recent_projection']["rec_tds"] *allreg_avgs['recent_projection']["weight"])*rec_coeff)
 
 
 
@@ -989,6 +1412,7 @@ while True:
                 ]
             window.extend_layout(window, new_rows)
             window.refresh()
+            print(output)
         elif pposition == "QB":
 
             # ------------------------------------------ #
@@ -1113,7 +1537,7 @@ while True:
                         att = valRow.iloc[0]['att']
                         rating = valRow.iloc[0]['rating']
                         isGame = True
-                else:
+                elif loc == "Home":
                     valRow = player_game_log[(player_game_log["game_location"] != "@") & (player_game_log["opp"] == oppTeamABR)]
                     print(valRow)
                     if len(valRow.index) > 0:
@@ -1361,7 +1785,7 @@ while True:
                     "int": intregression,
                     "rating": ratingregression,
                     "cmp": cmpregression,
-                    "weight" : 0.4
+                    "weight" : 0.15
                     },
                 }
 
@@ -1377,7 +1801,7 @@ while True:
                     "cmp": historical_cmp_proj,
                     "int": historical_int_proj,
                     "rating": historical_rating_proj,
-                    "weight" : 0.2
+                    "weight" : 0.35
                     },
                 }
             
@@ -1393,7 +1817,7 @@ while True:
                     "cmp": recent_games_cmp_proj,
                     "int": recent_games_int_proj,
                     "rating": recent_games_rating_proj,
-                    "weight" : 0.25
+                    "weight" : 0.35
                     },
                 }
             else:

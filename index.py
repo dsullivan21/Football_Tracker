@@ -990,7 +990,566 @@ while True:
             window.extend_layout(window, new_rows)
             window.refresh()
         elif pposition == "QB":
-            print(pposition)
+
+            # ------------------------------------------ #
+            # ------------------------------------------ #
+            # ------------- QUARTER BACKS -------------- # 
+            # ------------------------------------------ #
+            # ------------------------------------------ #
+
+            playerName = playerFirst + " " + playerLast
+
+            # ------ Load Opp Team Data for Model -------- #
+
+            tg.get_team_game_log(team = oppTeam, season = 2022)
+            t.home_road(team = oppTeam, season = 2022, avg = True)
+
+            opp_games = tg.get_team_game_log(team = oppTeam, season = 2022)
+            opp_splits = t.home_road(team = oppTeam, season = 2022, avg = True)
+
+            print(opp_games)
+            #Store Opposition Defense statistics 
+            opp_rushing_defense = opp_games.loc[:, 'opp_rush_yds'].values
+            opp_ru_defense_in_wins = opp_games[(opp_games["result"] == "W")]['opp_rush_yds'].values
+            opp_ru_defense_in_loss = opp_games[(opp_games["result"] == "L")]['opp_rush_yds'].values
+
+            #Opponent passing defense history
+            opp_pass_defense = opp_games.loc[:, 'opp_pass_yds'].values
+            opp_pass_defense_in_wins = opp_games[(opp_games["result"] == "W")]['opp_pass_yds'].values
+            opp_pass_defense_in_loss = opp_games[(opp_games["result"] == "L")]['opp_pass_yds'].values
+            passing_sum = sum(opp_pass_defense)
+
+            passing_average = passing_sum/len(opp_pass_defense)
+            #Win/Loss Splits
+            yval_wins = range(len(opp_pass_defense_in_wins))
+            yval_loss = range(len(opp_pass_defense_in_loss))
+
+            yval = range(len(opp_pass_defense))
+            val = linReg(yval, opp_pass_defense)[0]
+
+            defensive_pass_allowed = linearRegPredict(val, opp_pass_defense, yval)[0][0]
+
+            #get defensive passing projection coeff
+            pass_coeff = defensive_pass_allowed/passing_average
+
+            yval = range(len(opp_rushing_defense))
+            val = linReg(yval, opp_rushing_defense)[0]
+            rushing_sum = sum(opp_rushing_defense)
+
+            rushing_average = rushing_sum/len(opp_rushing_defense)
+
+            defensive_ru_allowed = linearRegPredict(val, opp_rushing_defense, yval)[0][0]
+
+            #get defensive rushing projection coeff
+
+            rushing_coeff = defensive_ru_allowed/rushing_average
+
+            # ---- Get ready to store historical data ---- #
+            historical_rushatt = []
+            historical_rushyrds = []
+            historical_rushtds = []
+            historical_cmp = []
+            historical_att = []
+            historical_pass_td = []
+            historical_int = []
+            historical_rating = []
+            historical_pass_yds = []
+
+            i = 2022
+            #search through last 4 years data
+            while (i >= 2019):
+            
+                try:
+                    player_game_log = p.get_player_game_log(player = playerName, position = pposition, season = i)
+                except:
+                    print("player didnt return a result")
+
+                # ---- Get data from all games for recent games trend ---- #
+                if i == 2022:
+                    recent_games_rushatt = player_game_log.loc[:,'rush_att'].values
+                    recent_games_rushyrds = player_game_log.loc[:,'rush_yds'].values
+                    recent_games_rushtds = player_game_log.loc[:,'rush_td'].values
+                    recent_games_cmp = player_game_log.loc[:,'cmp'].values
+                    recent_games_att = player_game_log.loc[:,'att'].values
+                    recent_games_pass_td = player_game_log.loc[:,'pass_td'].values
+                    recent_games_int = player_game_log.loc[:,'int'].values
+                    recent_games_rating = player_game_log.loc[:,'rating'].values
+                    recent_games_pass_yds = player_game_log.loc[:, 'pass_yds'].values
+                    
+                    historical_rushyrds.extend(player_game_log.loc[:,'rush_yds'].values)
+                    historical_int.extend(player_game_log.loc[:,'int'].values)
+                    historical_cmp.extend(player_game_log.loc[:,'cmp'].values)
+                    historical_att.extend(player_game_log.loc[:,'att'].values)
+                    historical_rushtds.extend(player_game_log.loc[:,'rush_td'].values)
+                    historical_rushatt.extend(player_game_log.loc[:,'rush_att'].values)
+                    historical_pass_td.extend( player_game_log.loc[:,'pass_td'].values)
+                    historical_pass_yds.extend( player_game_log.loc[:,'pass_yds'].values)
+                    historical_rating.extend( player_game_log.loc[:,'rating'].values)
+                else:
+                    historical_rushyrds.extend(player_game_log.loc[:,'rush_yds'].values)
+                    historical_int.extend(player_game_log.loc[:,'int'].values)
+                    historical_cmp.extend(player_game_log.loc[:,'cmp'].values)
+                    historical_att.extend(player_game_log.loc[:,'att'].values)
+                    historical_rushtds.extend(player_game_log.loc[:,'rush_td'].values)
+                    historical_rushatt.extend(player_game_log.loc[:,'rush_att'].values)
+                    historical_pass_td.extend( player_game_log.loc[:,'pass_td'].values)
+                    historical_pass_yds.extend( player_game_log.loc[:,'pass_yds'].values)
+                    historical_rating.extend( player_game_log.loc[:,'rating'].values)
+
+                isGame = False
+
+                if loc == "Away" :
+                # gets data for previous years similar game if available 
+                    valRow = player_game_log[(player_game_log["game_location"] == "@") & (player_game_log["opp"] == oppTeamABR)]
+                    print(valRow)
+                    if len(valRow.index) > 0:
+                        ruattemps = valRow.iloc[0]['rush_att']
+                        ruyards = valRow.iloc[0]['rush_yds']
+                        rutds = valRow.iloc[0]['rush_td']
+                        ints = valRow.iloc[0]['int']
+                        cmp = valRow.iloc[0]['cmp']
+                        pass_yds = valRow.iloc[0]['pass_yds']
+                        pass_tds =  valRow.iloc[0]['pass_td']
+                        att = valRow.iloc[0]['att']
+                        rating = valRow.iloc[0]['rating']
+                        isGame = True
+                else:
+                    valRow = player_game_log[(player_game_log["game_location"] != "@") & (player_game_log["opp"] == oppTeamABR)]
+                    print(valRow)
+                    if len(valRow.index) > 0:
+                        ruattemps = valRow.iloc[0]['rush_att']
+                        ruyards = valRow.iloc[0]['rush_yds']
+                        rutds = valRow.iloc[0]['rush_td']
+                        ints = valRow.iloc[0]['int']
+                        cmp = valRow.iloc[0]['cmp']
+                        pass_yds = valRow.iloc[0]['pass_yds']
+                        pass_tds =  valRow.iloc[0]['pass_td']
+                        att = valRow.iloc[0]['att']
+                        rating = valRow.iloc[0]['rating']
+                        isGame = True
+
+                print(isGame)
+                # Store game data
+                if isGame:
+                    gamedata = {
+                        "rush_attempts": ruattemps,
+                        "rush_yards": ruyards,
+                        "rush_tds": rutds,
+                        "att": att,
+                        "cmp": cmp,
+                        "pass_tds": pass_tds,
+                        "pass_yds": pass_yds,
+                        "rating": rating,
+                        "int": ints,
+                        "year": i
+                    }
+                    prevGames.append(gamedata)
+                i = i - 1
+             #END WHILE#
+
+            #---------- CALCULATE HISTORICAL MODEL ----------#
+
+            #rush yards
+            yvalues = range(len(historical_rushyrds))
+            val = linReg(yvalues, historical_rushyrds)[0]
+            historical_ruyards_proj = linearRegPredict(val, historical_rushyrds, yvalues)
+            historical_ruyards_proj = historical_ruyards_proj[0][0]
+            #pass yards
+            yvalues = range(len(historical_pass_yds))
+            val = linReg(yvalues, historical_pass_yds)[0]
+            historical_pass_yds_proj = linearRegPredict(val, historical_pass_yds, yvalues)[0][0]
+            #passTds
+            yvalues = range(len(historical_pass_td))
+            val = linReg(yvalues, historical_pass_td)[0]
+            historical_passtds_proj = linearRegPredict(val, historical_pass_td, yvalues)[0][0]
+            #rushTds
+            yvalues = range(len(historical_rushtds))
+            val = linReg(yvalues, historical_rushtds)[0]
+            historical_rutds_proj = linearRegPredict(val, historical_rushtds, yvalues)
+            historical_rutds_proj =historical_rutds_proj[0][0]
+            #rushatt
+            yvalues = range(len(historical_rushatt))
+            val = linReg(yvalues, historical_rushatt)[0]
+            historical_ruatt_proj = linearRegPredict(val, historical_rushatt, yvalues)
+            historical_ruatt_proj= historical_ruatt_proj[0][0]
+            #att
+            yvalues = range(len(historical_att))
+            val = linReg(yvalues, historical_att)[0]
+            historical_att_proj = linearRegPredict(val, historical_att, yvalues)[0][0]
+            #cmp
+            yvalues = range(len(historical_cmp))
+            val = linReg(yvalues, historical_cmp)[0]
+            historical_cmp_proj = linearRegPredict(val, historical_cmp, yvalues)[0][0]
+            #int
+            yvalues = range(len(historical_int))
+            val = linReg(yvalues, historical_int)[0]
+            historical_int_proj = linearRegPredict(val, historical_int, yvalues)[0][0]
+            #rating
+            yvalues = range(len(historical_rating))
+            val = linReg(yvalues, historical_rating)[0]
+            historical_rating_proj = linearRegPredict(val, historical_rating, yvalues)[0][0]
+
+            #---------- CALCULATE RECENT GAMES MODEL ----------#
+
+            #rush yards
+            yvalues = range(len(recent_games_rushyrds))
+            val = linReg(yvalues, recent_games_rushyrds)[0]
+            recent_games_rushyrds_proj = linearRegPredict(val, recent_games_rushyrds, yvalues)
+            recent_games_rushyrds_proj = recent_games_rushyrds_proj[0][0]
+            #pass yards
+            yvalues = range(len(recent_games_pass_yds))
+            val = linReg(yvalues, recent_games_pass_yds)[0]
+            recent_games_passyrds_proj = linearRegPredict(val, recent_games_pass_yds, yvalues)[0][0]
+            #passTds
+            yvalues = range(len(recent_games_pass_td))
+            val = linReg(yvalues, recent_games_pass_td)[0]
+            recent_games_passtds_proj = linearRegPredict(val, recent_games_pass_td, yvalues)[0][0]
+            #rushTds
+            yvalues = range(len(recent_games_rushtds))
+            val = linReg(yvalues, recent_games_rushtds)[0]
+            recent_games_rushtds_proj = linearRegPredict(val, recent_games_rushtds, yvalues)
+            recent_games_rushtds_proj =recent_games_rushtds_proj[0][0]
+            #rushatt
+            yvalues = range(len(recent_games_rushatt))
+            val = linReg(yvalues, recent_games_rushatt)[0]
+            recent_games_rushatt_proj = linearRegPredict(val, recent_games_rushatt, yvalues)
+            recent_games_rushatt_proj= recent_games_rushatt_proj[0][0]
+            #att
+            yvalues = range(len(recent_games_att))
+            val = linReg(yvalues, recent_games_att)[0]
+            recent_games_att_proj = linearRegPredict(val, recent_games_att, yvalues)[0][0]
+            #cmp
+            yvalues = range(len(recent_games_cmp))
+            val = linReg(yvalues, recent_games_cmp)[0]
+            recent_games_cmp_proj = linearRegPredict(val, recent_games_cmp, yvalues)[0][0]
+            #int
+            yvalues = range(len(recent_games_int))
+            val = linReg(yvalues, recent_games_int)[0]
+            recent_games_int_proj = linearRegPredict(val, recent_games_int, yvalues)[0][0]
+            #rating
+            yvalues = range(len(recent_games_rating))
+            val = linReg(yvalues, recent_games_rating)[0]
+            recent_games_rating_proj = linearRegPredict(val, recent_games_rating, yvalues)[0][0]
+
+            # -------- Previous Games ---------  #
+
+            totalruyards = 0
+            totaltds = 0
+            totalruatt = 0
+            totalatt = 0
+            totalcmp = 0
+            totalpassyards = 0
+            totalpasstds = 0
+            totalints = 0
+            totalrating = 0
+
+            count = 0
+            yval = []
+            yardTrend = []
+            ruattTrend = []
+            rutdTrend = []
+            passydsTrend = []
+            passtdTrend = []
+            attTrend = []
+            cmpTrend = []
+            intTrend = []
+            ratingTrend =[]
+
+            for game in prevGames:
+
+                totalruyards = totalruyards + game['rush_yards']
+                totaltds = totaltds + game['rush_tds']
+                totalruatt = totalruatt + game['rush_attempts']
+                totalatt = totalatt + game['att']
+                totalpassyards = totalpassyards +game['pass_yds']
+                totalpasstds = totalpasstds + game['pass_tds']
+                totalcmp = totalcmp +game['cmp']
+                totalints = totalints + game['int']
+                totalrating = totalrating + game['rating']
+
+                count = count + 1
+
+                yval.append(count)
+                yardTrend.append (game['rush_yards'])
+                ruattTrend.append (game['rush_attempts'])
+                rutdTrend.append(game['rush_tds'])
+                passtdTrend.append(game['pass_tds'])
+                attTrend.append(game['att'])
+                passydsTrend.append(game['pass_yds'])
+                cmpTrend.append(game['cmp'])
+                intTrend.append(game['int'])
+                ratingTrend.append(game['rating'])
+            
+            if count > 1: 
+                #rush yards
+                val = linReg(yval, yardTrend)[0]
+                yardregression = linearRegPredict(val, yardTrend, yval)
+                yardregression = yardregression[0][0]
+                #pass yards
+                val = linReg(yvalues, passydsTrend)[0]
+                passyardregression = linearRegPredict(val, passydsTrend, yval)
+                passyardregression = passyardregression[0][0]
+                #passTds
+                val = linReg(yvalues, passtdTrend)[0]
+                passtdregression = linearRegPredict(val, passtdTrend, yval)
+                passtdregression = passtdregression[0][0]
+                #rushTds
+                val = linReg(yvalues, rutdTrend)[0]
+                rutdregression = linearRegPredict(val, rutdTrend, yval)
+                rutdregression =rutdregression[0][0]
+                #rushatt
+                val = linReg(yval, ruattTrend)[0]
+                ruattregression = linearRegPredict(val, ruattTrend, yval)
+                ruattregression= ruattregression[0][0]
+                #att
+                val = linReg(yvalues, attTrend)[0]
+                attregression = linearRegPredict(val, attTrend, yval)
+                attregression =attregression[0][0]
+                #cmp
+                val = linReg(yvalues, cmpTrend)[0]
+                cmpregression = linearRegPredict(val, cmpTrend, yval)
+                cmpregression =cmpregression[0][0]
+                #int
+                val = linReg(yvalues, intTrend)[0]
+                intregression = linearRegPredict(val, intTrend, yval)
+                intregression =intregression[0][0]
+                #rating
+                val = linReg(yvalues, ratingTrend)[0]
+                ratingregression = linearRegPredict(val, ratingTrend, yval)
+                ratingregression =ratingregression[0][0]
+
+
+                # print(attregression)
+                # print (tdRegression)
+
+                # --- Calc averages from previous 4 games --- #
+                totalruyards = totalruyards/count
+                totaltds = totaltds/count
+                totalatt = totalatt/count
+                totalruatt = totalruatt/count
+                totalcmp = totalcmp/count
+                totalints = totalints/count
+                totalrating = totalrating/count
+                totalpassyards = totalpassyards/count
+                totalpasstds = totalpasstds/count
+
+            if count > 1:
+                # ----- Previous Similar Games ----- #
+                avgs = { "recent_projection": {
+                    "rush_attempts": totalruatt,
+                    "rush_yards": totalruyards,
+                    "att": totalatt,
+                    "pass_yards": totalpassyards,
+                    "rush_tds": totaltds,
+                    "pass_tds": totalpasstds,
+                    "pass_yds": totalpassyards,
+                    "int": totalints,
+                    "rating": totalrating,
+                    "cmp": totalcmp,
+                    "weight" : 0.15
+                    },
+                }
+
+                # ------ Projection from previous games ----- #
+                reg_avgs = { "recent_projection": {
+                    "rush_attempts": ruattregression,
+                    "rush_yards": yardregression,
+                    "att": attregression,
+                    "pass_yards": passyardregression,
+                    "rush_tds": rutdregression,
+                    "pass_tds": passtdregression,
+                    "int": intregression,
+                    "rating": ratingregression,
+                    "cmp": cmpregression,
+                    "weight" : 0.4
+                    },
+                }
+
+                # ------ Historical Projections -------- #
+                hist_avg = { 
+                    "recent_projection": {
+                    "rush_attempts": historical_ruatt_proj,
+                    "rush_yards": historical_ruyards_proj,
+                    "att": historical_att_proj,
+                    "pass_yards": historical_pass_yds_proj,
+                    "rush_tds": historical_rutds_proj,
+                    "pass_tds": historical_passtds_proj,
+                    "cmp": historical_cmp_proj,
+                    "int": historical_int_proj,
+                    "rating": historical_rating_proj,
+                    "weight" : 0.2
+                    },
+                }
+            
+                # ------ Recent Game Projections -------- #
+                recent_avg = { 
+                    "recent_projection": {
+                    "rush_attempts": recent_games_rushatt_proj,
+                    "rush_yards": recent_games_rushyrds_proj,
+                    "att": recent_games_att_proj,
+                    "pass_yards": recent_games_passyrds_proj,
+                    "rush_tds": recent_games_rushtds_proj,
+                    "pass_tds": recent_games_passtds_proj,
+                    "cmp": recent_games_cmp_proj,
+                    "int": recent_games_int_proj,
+                    "rating": recent_games_rating_proj,
+                    "weight" : 0.25
+                    },
+                }
+            else:
+                # ----- Previous Similar Games ----- #
+                avgs = { "recent_projection": {
+                    "rush_attempts": 0,
+                    "rush_yards": 0,
+                    "att": 0,
+                    "cmp": 0,
+                    "pass_yards": 0,
+                    "rush_tds": 0,
+                    "pass_tds": 0,
+                    "pass_yds": 0,
+                    "int": 0,
+                    "rating": 0,
+                    "weight" : 0
+                    },
+                }
+
+                # ------ Projection from previous games ----- #
+                reg_avgs = { "recent_projection": {
+                    "rush_attempts": 0,
+                    "rush_yards": 0,
+                    "att": 0,
+                    "pass_yards": 0,
+                    "rush_tds": 0,
+                    "pass_tds": 0,
+                    "int": 0,
+                    "rating": 0,
+                    "cmp": 0,
+                    "weight" : 0
+                    },
+                }
+
+                # ------ Historical Projections -------- #
+                hist_avg = { 
+                    "recent_projection": {
+                    "rush_attempts": historical_ruatt_proj,
+                    "rush_yards": historical_ruyards_proj,
+                    "att": historical_att_proj,
+                    "pass_yards": historical_pass_yds_proj,
+                    "rush_tds": historical_rutds_proj,
+                    "pass_tds": historical_passtds_proj,
+                    "cmp": historical_cmp_proj,
+                    "int": historical_int_proj,
+                    "rating": historical_rating_proj,
+                    "weight" : 0.5
+                    },
+                }
+            
+                # ------ Recent Game Projections -------- #
+                recent_avg = { 
+                    "recent_projection": {
+                    "rush_attempts": recent_games_rushatt_proj,
+                    "rush_yards": recent_games_rushyrds_proj,
+                    "att": recent_games_att_proj,
+                    "pass_yards": recent_games_passyrds_proj,
+                    "rush_tds": recent_games_rushtds_proj,
+                    "pass_tds": recent_games_passtds_proj,
+                    "cmp": recent_games_cmp_proj,
+                    "int": recent_games_int_proj,
+                    "rating": recent_games_rating_proj,
+                    "weight" : 0.5
+                    },
+                }
+            # ENDIF #
+            # ---- CALC ---- #
+            #----rush attempts----#
+
+            rush_att_full = 0
+            rush_att_full = rush_att_full + ((recent_avg['recent_projection']["rush_attempts"] *recent_avg['recent_projection']["weight"])*rushing_coeff)
+            rush_att_full = rush_att_full + ((hist_avg['recent_projection']["rush_attempts"] *hist_avg['recent_projection']["weight"])*rushing_coeff)
+            rush_att_full = rush_att_full + ((reg_avgs['recent_projection']["rush_attempts"] *reg_avgs['recent_projection']["weight"])*rushing_coeff)
+            rush_att_full = rush_att_full + ((avgs['recent_projection']["rush_attempts"] *avgs['recent_projection']["weight"])*rushing_coeff)
+
+            #----rush tds----#
+            rush_tds_full = 0
+            rush_tds_full = rush_tds_full + (recent_avg['recent_projection']["rush_tds"] *recent_avg['recent_projection']["weight"])
+            rush_tds_full = rush_tds_full + (hist_avg['recent_projection']["rush_tds"] *hist_avg['recent_projection']["weight"])
+            rush_tds_full = rush_tds_full + (reg_avgs['recent_projection']["rush_tds"] *reg_avgs['recent_projection']["weight"])
+            rush_tds_full = rush_tds_full + (avgs['recent_projection']["rush_tds"] *avgs['recent_projection']["weight"])
+
+            #----rush yds----#
+            rush_yds_full = 0
+            rush_yds_full = rush_yds_full + ((recent_avg['recent_projection']["rush_yards"] *recent_avg['recent_projection']["weight"]) * rushing_coeff)
+            rush_yds_full = rush_yds_full + ((hist_avg['recent_projection']["rush_yards"] *hist_avg['recent_projection']["weight"]) * rushing_coeff)
+            rush_yds_full = rush_yds_full + ((reg_avgs['recent_projection']["rush_yards"] *reg_avgs['recent_projection']["weight"]) * rushing_coeff)
+            rush_yds_full = rush_yds_full + ((avgs['recent_projection']["rush_yards"] *avgs['recent_projection']["weight"])*rushing_coeff)
+
+            #---- completions ----#
+            cmp_full = 0
+            cmp_full = cmp_full + ((recent_avg['recent_projection']["cmp"] *recent_avg['recent_projection']["weight"])*pass_coeff)
+            cmp_full = cmp_full + ((hist_avg['recent_projection']["cmp"] *hist_avg['recent_projection']["weight"])*pass_coeff)
+            cmp_full = cmp_full + ((reg_avgs['recent_projection']["cmp"] *reg_avgs['recent_projection']["weight"])*pass_coeff)
+            cmp_full = cmp_full + ((avgs['recent_projection']["cmp"] *avgs['recent_projection']["weight"])*pass_coeff)
+
+            #---- att ----#
+            att_full = 0
+            att_full = att_full + ((recent_avg['recent_projection']["att"] *recent_avg['recent_projection']["weight"])*pass_coeff)
+            att_full = att_full + ((hist_avg['recent_projection']["att"] *hist_avg['recent_projection']["weight"])*pass_coeff)
+            att_full = att_full + ((reg_avgs['recent_projection']["att"] *reg_avgs['recent_projection']["weight"])*pass_coeff)
+            att_full = att_full + ((avgs['recent_projection']["att"] *avgs['recent_projection']["weight"])*pass_coeff)
+
+            #---- int ----#
+            int_full = 0
+            int_full = int_full + ((recent_avg['recent_projection']["int"] *recent_avg['recent_projection']["weight"]))
+            int_full = int_full + ((hist_avg['recent_projection']["int"] *hist_avg['recent_projection']["weight"]))
+            int_full = int_full + ((reg_avgs['recent_projection']["int"] *reg_avgs['recent_projection']["weight"]))
+            int_full = int_full + ((avgs['recent_projection']["int"] *avgs['recent_projection']["weight"]))
+
+            #---- rating ----#
+            rating_full = 0
+            rating_full = rating_full + ((recent_avg['recent_projection']["rating"] *recent_avg['recent_projection']["weight"])*pass_coeff)
+            rating_full = rating_full + ((hist_avg['recent_projection']["rating"] *hist_avg['recent_projection']["weight"])*pass_coeff)
+            rating_full = rating_full + ((reg_avgs['recent_projection']["rating"] *reg_avgs['recent_projection']["weight"])*pass_coeff)
+            rating_full = rating_full + ((avgs['recent_projection']["rating"] *avgs['recent_projection']["weight"])*pass_coeff)
+            
+            #----pass yds----#
+            pass_yds_full = 0
+            pass_yds_full = pass_yds_full + ((recent_avg['recent_projection']["pass_yards"] *recent_avg['recent_projection']["weight"]) *pass_coeff)
+            pass_yds_full = pass_yds_full + ((hist_avg['recent_projection']["pass_yards"] *hist_avg['recent_projection']["weight"])*pass_coeff)
+            pass_yds_full = pass_yds_full + ((reg_avgs['recent_projection']["pass_yards"] *reg_avgs['recent_projection']["weight"])*pass_coeff)
+            pass_yds_full = pass_yds_full + ((avgs['recent_projection']["pass_yards"] *avgs['recent_projection']["weight"])*pass_coeff)
+
+            #----pass tds----#
+            pass_tds_full = 0
+            pass_tds_full = pass_tds_full + (recent_avg['recent_projection']["pass_tds"] *recent_avg['recent_projection']["weight"])
+            pass_tds_full = pass_tds_full + (hist_avg['recent_projection']["pass_tds"] *hist_avg['recent_projection']["weight"])
+            pass_tds_full = pass_tds_full + (reg_avgs['recent_projection']["pass_tds"] *reg_avgs['recent_projection']["weight"])
+            pass_tds_full = pass_tds_full + (avgs['recent_projection']["pass_tds"] *avgs['recent_projection']["weight"])
+
+
+
+            print(allData)
+
+            arr = [rush_att_full, rush_yds_full, rush_tds_full, att_full, cmp_full, int_full, pass_yds_full, pass_tds_full, rating_full ]
+            
+            output = pd.DataFrame(np.array([arr]), columns=['Rush Attempts:', 'Rush Yards:', 'Rush Tds:', "Attemps", "Completions", "ints", "Pass Yards", "Pass Tds", "rating"])
+
+            #Print prev game data
+            if count > 1:
+                averages = "Rush Att: "+ str(totalatt) +"\n"+ "Rush Yards: "+ str(totalruyards) +"\n"+"Rush Tds: "+ str(totaltds) +"\n"+"Pass Yards: "+ str(totalpassyards) +"\n"+"att: "+ str(totalatt) +"\n"+"Pass Tds: "+ str(totalpasstds) +"\n"
+
+                #Print Regression Projections
+                regression = "Rush Att: " +str(attregression) + " Rush Yards: "+ str(yardregression) + " Tds: " + str(rutdregression) + " ints: "+ str(intregression) + " pass Yards: "+ str(passyardregression)
+
+                new_rows = [[sg.Text(playerName + " Previous "+ str(count) + " " + loc + " game averages versus the "+ oppTeam)], [sg.Text(averages)],
+                [sg.Text("Regression Only Model From Previous Similar Games Projects: ")], [sg.Text(regression)], 
+                [sg.Text("Our Model Projects: ")], [sg.Text(output)]
+                ]
+            else:
+                new_rows = [ 
+                [sg.Text("Our Model Projects: ")], [sg.Text(output)]
+                ]
+            window.extend_layout(window, new_rows)
+            window.refresh()
         else:
             print("Position Not Valid")
     if event == 'Cycle Layout':

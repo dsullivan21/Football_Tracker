@@ -1,0 +1,36 @@
+{
+    "KAN":{
+        "QB": "Patrick Mahomes",
+        "RB": {
+            "1": "Isiah Pacheco",
+            "2": "Jerick McKinnon"
+        },
+        "WR":{
+           "1": "Skyy Moore",
+           "2": "Marquez Valdes-Scantling",
+           "3": "Kadarious Toney",
+           "4": "Richie James"
+        }, 
+        "TE":{
+            "1": "Travis Kelce",
+            "2": "Noah Gray"
+        }
+    },
+    "DET":{
+        "QB": "Jared Goff",
+        "RB": {
+            "1": "David Montgomery"
+        },
+        "WR":{
+           "1": "Amon-Ra St. Brown",
+           "2": "Marvin Jones",
+           "3": "Josh Reynolds",
+           "4": "Kalif Raymond"
+        }, 
+        "TE":{
+            "1": "Sam LaPorta"
+        }
+
+    }
+        
+}

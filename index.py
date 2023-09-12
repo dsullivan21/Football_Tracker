@@ -584,7 +584,7 @@ def runRbProj(playerFirst, playerLast, pposition, oppTeam,oppTeamABR,loc, player
             "rec_yards": totalrecyards,
             "rush_tds": totaltds,
             "rec_tds": totalrectds,
-            "weight" : 0.1
+            "weight" : 0.05
             },
         }
 
@@ -622,7 +622,7 @@ def runRbProj(playerFirst, playerLast, pposition, oppTeam,oppTeamABR,loc, player
             "rec_yards": recent_games_recyrds_proj,
             "rush_tds": recent_games_rushtds_proj,
             "rec_tds": recent_games_rectds_proj,
-            "weight" : 0.15
+            "weight" : 0.2
             },
         }
     elif count < 1 and len(allprevGames) > 1:
@@ -659,7 +659,7 @@ def runRbProj(playerFirst, playerLast, pposition, oppTeam,oppTeamABR,loc, player
             "rec_yards": historical_recyards_proj,
             "rush_tds": historical_rutds_proj,
             "rec_tds": historical_rectds_proj,
-            "weight" : 0.3
+            "weight" : 0.2
             },
         }
     
@@ -672,7 +672,7 @@ def runRbProj(playerFirst, playerLast, pposition, oppTeam,oppTeamABR,loc, player
             "rec_yards": recent_games_recyrds_proj,
             "rush_tds": recent_games_rushtds_proj,
             "rec_tds": recent_games_rectds_proj,
-            "weight" : 0.3
+            "weight" : 0.4
             },
         }
     else:
@@ -709,7 +709,7 @@ def runRbProj(playerFirst, playerLast, pposition, oppTeam,oppTeamABR,loc, player
             "rec_yards": historical_recyards_proj,
             "rush_tds": historical_rutds_proj,
             "rec_tds": historical_rectds_proj,
-            "weight" : 0.45
+            "weight" : 0.35
             },
         }
     
@@ -722,7 +722,7 @@ def runRbProj(playerFirst, playerLast, pposition, oppTeam,oppTeamABR,loc, player
             "rec_yards": recent_games_recyrds_proj,
             "rush_tds": recent_games_rushtds_proj,
             "rec_tds": recent_games_rectds_proj,
-            "weight" : 0.45
+            "weight" : 0.55
             },
         }
 
@@ -1001,7 +1001,6 @@ def runWRProj(playerFirst, playerLast, pposition, oppTeam,oppTeamABR,loc, player
 
         #END WHILE#
         #---------- CALCULATE HISTORICAL MODEL ----------#
-
     #snap count
     yvalues = range(len(historical_snap_pct))
     val = linReg(yvalues, historical_snap_pct)[0]
@@ -1029,7 +1028,6 @@ def runWRProj(playerFirst, playerLast, pposition, oppTeam,oppTeamABR,loc, player
     historical_targets_proj =historical_targets_proj[0][0]
 
     # print("historical_ruyards_proj: ", historical_ruyards_proj, " historical_recyards_proj ", historical_recyards_proj, " historical_rectds_proj ", historical_rectds_proj, " historical_rutds_proj ",historical_rutds_proj, " historical_ruatt_proj ", historical_rec_proj , " historical_targets_proj ", historical_targets_proj  )
-
     #---------- CALCULATE RECENT GAMES MODEL ----------#
     passing_allowed = (pass_d_w * (oppWinProb/100)) + (pass_d_l * (fpi_values[playerTeam]/100))
 
@@ -1641,7 +1639,6 @@ def runQBProj(playerFirst, playerLast, pposition, oppTeam,oppTeamABR,loc, player
         #END WHILE#
 
     #---------- CALCULATE HISTORICAL MODEL ----------#
-
     passing_allowed = (pass_d_w * (oppWinProb/100)) + (pass_d_l * (fpi_values[playerTeam]/100))
   #  pass_coeff = passing_allowed/passing_average
   #  print(pass_coeff)

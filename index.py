@@ -101,10 +101,54 @@ def win_loss_calc (team_fpi, opp_fpi, player_wl_splits, playerpos):
                 "targets": totaltarg,
                 "rec_yards": totalrecyards,
                 "rec_tds": totalrectds,
-                "weight" : 0.2
+                "weight" : 0.15
             },
         }
         print("WL SPLIT: ", arr)
+
+    elif playerpos == "QB":
+
+        w_ruattemps = player_wl_splits.loc['W']['rush_att']
+        w_ruyards = player_wl_splits.loc['W']['rush_yds']
+        w_rutds = player_wl_splits.loc['W']['rush_td']
+        w_att = player_wl_splits.loc['W']['att']
+        w_cmp = player_wl_splits.loc['W']['cmp']
+        w_pass_yards = player_wl_splits.loc['W']['pass_yds']
+        w_pass_tds = player_wl_splits.loc['W']['pass_td']
+        w_pass_ints = player_wl_splits.loc['W']['int']
+
+        l_ruattemps = player_wl_splits.loc['L']['rush_att']
+        l_ruyards = player_wl_splits.loc['L']['rush_yds']
+        l_rutds = player_wl_splits.loc['L']['rush_td']
+        l_att = player_wl_splits.loc['L']['att']
+        l_cmp = player_wl_splits.loc['L']['cmp']
+        l_pass_yards = player_wl_splits.loc['L']['pass_yds']
+        l_pass_tds = player_wl_splits.loc['L']['pass_td']
+        l_pass_ints = player_wl_splits.loc['L']['int']
+
+        totalruatt = (w_ruattemps *team_fpi) + (l_ruattemps * opp_fpi)
+        totalatt = (w_att *team_fpi) + (w_att * opp_fpi)
+        totalruyards = (w_ruyards *team_fpi) + (l_ruyards * opp_fpi)
+        totalcmp = (w_cmp *team_fpi) + (l_cmp * opp_fpi)
+        totalpassyards = (w_pass_yards *team_fpi) + (l_pass_yards * opp_fpi)
+        totaltds = (w_rutds *team_fpi) + (l_rutds * opp_fpi)
+        totalpasstds = (w_pass_tds *team_fpi) + (l_pass_tds * opp_fpi)
+        totalints = (w_pass_ints *team_fpi) + (l_pass_ints * opp_fpi)
+        
+        arr = {
+            "recent_projection":{
+                "rush_attempts": totalruatt,
+                "rush_yards": totalruyards,
+                "rush_tds": totaltds,
+                "att": totalatt,
+                "cmp": totalcmp,
+                "int": totalints,
+                "pass_yards": totalpassyards,
+                "pass_tds": totalpasstds,
+                "weight": 0.15
+            },
+        }
+
 
     return arr
 
@@ -159,12 +203,12 @@ def linearRegPredict(predictVal, xval, yval):
 
 
 #confidence interval function
-def mean_confidence_interval(data, confidence=0.95):
+def mean_confidence_interval(data, confidence=0.80):
     a = 1.0 * np.array(data)
     n = len(a)
     m, se = np.mean(a), scipy.stats.sem(a)
     h = se * scipy.stats.t.ppf((1 + confidence) / 2., n-1)
-    return m, m-h, m+h
+    return [m, m-h, m+h]
 
 def runRbProj(playerFirst, playerLast, pposition, oppTeam,oppTeamABR,loc, playerfull):
     # ------ Load Player data for Model ----- #
@@ -420,6 +464,8 @@ def runRbProj(playerFirst, playerLast, pposition, oppTeam,oppTeamABR,loc, player
     rectdTrend = []
     targTrend = []
     recyrdTrend = []
+
+    confidence = mean_confidence_interval(recent_games_rushyrds)
 
     #all Prev Games
     if len(allprevGames) > 1:
@@ -842,6 +888,7 @@ def runRbProj(playerFirst, playerLast, pposition, oppTeam,oppTeamABR,loc, player
     window.extend_layout(window, new_rows)
     window.refresh()
     print(output)
+    print(confidence)
 
 def runWRProj(playerFirst, playerLast, pposition, oppTeam,oppTeamABR,loc, playerfull):
 
@@ -907,30 +954,48 @@ def runWRProj(playerFirst, playerLast, pposition, oppTeam,oppTeamABR,loc, player
     historical_targets = []
     historical_recyrds = []
     historical_rectds = []
+    recent_games_rec = []
+    recent_games_snap_pct = []
+    recent_games_targets = []
+    recent_games_recyrds = []
+    recent_games_rectds = []
 
-    i = 2022
+    dfLive = True
+
+    i = 2023
     #search through last 4 years data
     while (i >= 2019):
     
         try:
             player_game_log = p.get_player_game_log(player = playerName, position = pposition, season = i)
+            dfLive = True
         except:
             print("player didnt return a result")
+            dfLive = False
+
 
         # ---- Get data from all games for recent games trend ---- #
-        if i == 2022:
-            playerTeam = player_game_log.loc[1]['team']
-            recent_games_rec = player_game_log.loc[:,'rec'].values
-            recent_games_snap_pct = player_game_log.loc[:,'snap_pct'].values
-            recent_games_targets = player_game_log.loc[:,'tgt'].values
-            recent_games_recyrds = player_game_log.loc[:,'rec_yds'].values
-            recent_games_rectds = player_game_log.loc[:,'rec_td'].values
+        if i == 2023 and dfLive == True:
+            playerTeam = player_game_log.loc[0]['team']
+            recent_games_rec.extend(player_game_log.loc[:,'rec'].values)
+            recent_games_snap_pct.extend(player_game_log.loc[:,'snap_pct'].values)
+            recent_games_targets.extend(player_game_log.loc[:,'tgt'].values)
+            recent_games_recyrds.extend(player_game_log.loc[:,'rec_yds'].values)
+            recent_games_rectds.extend(player_game_log.loc[:,'rec_td'].values)
+        elif i == 2022 and dfLive == True:
+            if playerTeam == "":
+                playerTeam = player_game_log.loc[0]['team']
+            recent_games_rec.extend(player_game_log.loc[:,'rec'].values)
+            recent_games_snap_pct.extend(player_game_log.loc[:,'snap_pct'].values)
+            recent_games_targets.extend(player_game_log.loc[:,'tgt'].values)
+            recent_games_recyrds.extend(player_game_log.loc[:,'rec_yds'].values)
+            recent_games_rectds.extend(player_game_log.loc[:,'rec_td'].values)
             historical_rectds.extend(player_game_log.loc[:,'rec_td'].values)
             historical_recyrds.extend(player_game_log.loc[:,'rec_yds'].values)
             historical_snap_pct.extend(player_game_log.loc[:,'snap_pct'].values)
             historical_rec.extend(player_game_log.loc[:,'rec'].values)
             historical_targets.extend( player_game_log.loc[:,'tgt'].values)
-        else:
+        elif dfLive == True:
             historical_rectds.extend(player_game_log.loc[:,'rec_td'].values)
             historical_recyrds.extend(player_game_log.loc[:,'rec_yds'].values)
             historical_snap_pct.extend(player_game_log.loc[:,'snap_pct'].values)
@@ -943,7 +1008,7 @@ def runWRProj(playerFirst, playerLast, pposition, oppTeam,oppTeamABR,loc, player
 
         isGame = False
 
-        if loc == "Away" :
+        if loc == "Away" and dfLive == True:
         # gets data for previous years similar game if available 
             valRow = player_game_log[(player_game_log["game_location"] == "@") & (player_game_log["opp"] == oppTeamABR)]
             print(valRow)
@@ -959,7 +1024,7 @@ def runWRProj(playerFirst, playerLast, pposition, oppTeam,oppTeamABR,loc, player
                 all_recyards = valRow.iloc[0]['rec_yds']
                 all_rectds = valRow.iloc[0]['rec_td']
                 isGame = True
-        elif loc == "Home":
+        elif loc == "Home" and dfLive == True:
             valRow = player_game_log[(player_game_log["game_location"] != "@") & (player_game_log["opp"] == oppTeamABR)]
             print(valRow)
             if len(valRow.index) > 0:
@@ -1036,6 +1101,24 @@ def runWRProj(playerFirst, playerLast, pposition, oppTeam,oppTeamABR,loc, player
     print("passing diff: ", pass_val)
     print ("to add to coeff " ,new_val)
     rec_coeff = rec_coeff + new_val
+
+    # 4 year averages 
+    recTds_4yr_average = sum(historical_rectds)/len(historical_rectds)
+    recyrds_4yr_average = sum(historical_recyrds)/len(historical_recyrds)
+    snap_pct_4yr_average = sum(historical_snap_pct)/len(historical_snap_pct)
+    rec_4yr_average = sum(historical_rec)/len(historical_rec)
+    tar_4yr_average = sum(historical_targets)/len(historical_targets)
+
+    four_year_avgs = { 
+        "recent_projection": {
+            "rec": rec_4yr_average,
+            "snap_pct": snap_pct_4yr_average,
+            "targets": tar_4yr_average,
+            "rec_yards": recyrds_4yr_average,
+            "rec_tds": recTds_4yr_average,
+            "weight" : 0.1
+        },
+    }
 
     
     #snap count
@@ -1137,7 +1220,7 @@ def runWRProj(playerFirst, playerLast, pposition, oppTeam,oppTeamABR,loc, player
             "targets": totaltarg,
             "rec_yards": totalrecyards,
             "rec_tds": totalrectds,
-            "weight" : 0.15
+            "weight" : 0.2
             },
         }
 
@@ -1168,6 +1251,11 @@ def runWRProj(playerFirst, playerLast, pposition, oppTeam,oppTeamABR,loc, player
     rectdTrend = []
     targTrend = []
     recyrdTrend = []
+
+    confidence = mean_confidence_interval(recent_games_recyrds)
+    #historical_confidence = mean_confidence_interval(historical_recyrds)
+
+    #confidence = [(recent_confidence[0]/2) + (historical_confidence[0]/2), (recent_confidence[1]/2) + (historical_confidence[1]/2), (recent_confidence[2]/2) + (historical_confidence[2]/2)]
 
     for game in prevGames:
 
@@ -1241,7 +1329,7 @@ def runWRProj(playerFirst, playerLast, pposition, oppTeam,oppTeamABR,loc, player
             "targets": targregression,
             "rec_yards": recyardregression,
             "rec_tds": rectdregression,
-            "weight" : 0.1
+            "weight" : 0.05
             },
         }
 
@@ -1253,7 +1341,7 @@ def runWRProj(playerFirst, playerLast, pposition, oppTeam,oppTeamABR,loc, player
                 "targets": historical_targets_proj,
                 "rec_yards": historical_recyards_proj,
                 "rec_tds": historical_rectds_proj,
-                "weight" : 0.15
+                "weight" : 0.1
             },
         }
     
@@ -1299,7 +1387,7 @@ def runWRProj(playerFirst, playerLast, pposition, oppTeam,oppTeamABR,loc, player
                 "targets": historical_targets_proj,
                 "rec_yards": historical_recyards_proj,
                 "rec_tds": historical_rectds_proj,
-                "weight" : 0.25
+                "weight" : 0.15
             },
         }
     
@@ -1345,7 +1433,7 @@ def runWRProj(playerFirst, playerLast, pposition, oppTeam,oppTeamABR,loc, player
                 "targets": historical_targets_proj,
                 "rec_yards": historical_recyards_proj,
                 "rec_tds": historical_rectds_proj,
-                "weight" : 0.4
+                "weight" : 0.25
             },
         }
     
@@ -1357,7 +1445,7 @@ def runWRProj(playerFirst, playerLast, pposition, oppTeam,oppTeamABR,loc, player
                 "targets": recent_games_targets_proj,
                 "rec_yards": recent_games_recyrds_proj,
                 "rec_tds": recent_games_rectds_proj,
-                "weight" : 0.4
+                "weight" : 0.5
             },
         }
 
@@ -1378,6 +1466,7 @@ def runWRProj(playerFirst, playerLast, pposition, oppTeam,oppTeamABR,loc, player
     rec_full = rec_full + ((reg_avgs['recent_projection']["rec"] *reg_avgs['recent_projection']["weight"])*rec_coeff)
     rec_full = rec_full + ((avgs['recent_projection']["rec"] *avgs['recent_projection']["weight"])*rec_coeff)
     rec_full = rec_full + ((win_loss_split['recent_projection']["rec"] *win_loss_split['recent_projection']["weight"])*rec_coeff)
+    rec_full = rec_full + ((four_year_avgs['recent_projection']["rec"] *four_year_avgs['recent_projection']["weight"])*rec_coeff)
     if len(allprevGames) > 1:
         rec_full = rec_full + ((all_avgs['recent_projection']["rec"] *all_avgs['recent_projection']["weight"])*rec_coeff)
         rec_full = rec_full + ((allreg_avgs['recent_projection']["rec"] *allreg_avgs['recent_projection']["weight"])*rec_coeff)
@@ -1390,6 +1479,7 @@ def runWRProj(playerFirst, playerLast, pposition, oppTeam,oppTeamABR,loc, player
     snap_pct_full = snap_pct_full + ((reg_avgs['recent_projection']["snap_pct"] *reg_avgs['recent_projection']["weight"])*rec_coeff)
     snap_pct_full = snap_pct_full + ((avgs['recent_projection']["snap_pct"] *avgs['recent_projection']["weight"])*rec_coeff)
     snap_pct_full = snap_pct_full + ((win_loss_split['recent_projection']["snap_pct"] *win_loss_split['recent_projection']["weight"])*rec_coeff)
+    snap_pct_full = snap_pct_full + ((four_year_avgs['recent_projection']["snap_pct"] *four_year_avgs['recent_projection']["weight"])*rec_coeff)
     if len(allprevGames) > 1:
         snap_pct_full = snap_pct_full + ((all_avgs['recent_projection']["snap_pct"] *all_avgs['recent_projection']["weight"])*rec_coeff)
         snap_pct_full = snap_pct_full + ((allreg_avgs['recent_projection']["snap_pct"] *allreg_avgs['recent_projection']["weight"])*rec_coeff)
@@ -1401,6 +1491,7 @@ def runWRProj(playerFirst, playerLast, pposition, oppTeam,oppTeamABR,loc, player
     tgt_full = tgt_full + ((reg_avgs['recent_projection']["targets"] *reg_avgs['recent_projection']["weight"])*rec_coeff)
     tgt_full = tgt_full + ((avgs['recent_projection']["targets"] *avgs['recent_projection']["weight"])*rec_coeff)
     tgt_full = tgt_full + ((win_loss_split['recent_projection']["targets"] *win_loss_split['recent_projection']["weight"])*rec_coeff)
+    tgt_full = tgt_full + ((four_year_avgs['recent_projection']["targets"] *four_year_avgs['recent_projection']["weight"])*rec_coeff)
     if len(allprevGames) > 1:
         tgt_full = tgt_full + ((all_avgs['recent_projection']["targets"] *all_avgs['recent_projection']["weight"])*rec_coeff)
         tgt_full = tgt_full + ((allreg_avgs['recent_projection']["targets"] *allreg_avgs['recent_projection']["weight"])*rec_coeff)
@@ -1412,6 +1503,7 @@ def runWRProj(playerFirst, playerLast, pposition, oppTeam,oppTeamABR,loc, player
     rec_yds_full = rec_yds_full + ((reg_avgs['recent_projection']["rec_yards"] *reg_avgs['recent_projection']["weight"])*rec_coeff)
     rec_yds_full = rec_yds_full + ((avgs['recent_projection']["rec_yards"] *avgs['recent_projection']["weight"])*rec_coeff)
     rec_yds_full = rec_yds_full + ((win_loss_split['recent_projection']["rec_yards"] *win_loss_split['recent_projection']["weight"])*rec_coeff)
+    rec_yds_full = rec_yds_full + ((four_year_avgs['recent_projection']["rec_yards"] *four_year_avgs['recent_projection']["weight"])*rec_coeff)
     if len(allprevGames) > 1:
         rec_yds_full = rec_yds_full + ((all_avgs['recent_projection']["rec_yards"] *all_avgs['recent_projection']["weight"])*rec_coeff)
         rec_yds_full = rec_yds_full + ((allreg_avgs['recent_projection']["rec_yards"] *allreg_avgs['recent_projection']["weight"])*rec_coeff)
@@ -1423,6 +1515,7 @@ def runWRProj(playerFirst, playerLast, pposition, oppTeam,oppTeamABR,loc, player
     rec_tds_full = rec_tds_full + (reg_avgs['recent_projection']["rec_tds"] *reg_avgs['recent_projection']["weight"])
     rec_tds_full = rec_tds_full + (avgs['recent_projection']["rec_tds"] *avgs['recent_projection']["weight"])
     rec_tds_full = rec_tds_full + ((win_loss_split['recent_projection']["rec_tds"] *win_loss_split['recent_projection']["weight"]))
+    rec_tds_full = rec_tds_full + ((four_year_avgs['recent_projection']["rec_tds"] *four_year_avgs['recent_projection']["weight"]))
     if len(allprevGames) > 1:
         rec_tds_full = rec_tds_full + ((all_avgs['recent_projection']["rec_tds"] *all_avgs['recent_projection']["weight"])*rec_coeff)
         rec_tds_full = rec_tds_full + ((allreg_avgs['recent_projection']["rec_tds"] *allreg_avgs['recent_projection']["weight"])*rec_coeff)
@@ -1465,6 +1558,7 @@ def runWRProj(playerFirst, playerLast, pposition, oppTeam,oppTeamABR,loc, player
     window.extend_layout(window, new_rows)
     window.refresh()
     print(output)
+    print(confidence)
 
 def runQBProj(playerFirst, playerLast, pposition, oppTeam,oppTeamABR,loc, playerfull):
     prevGames = []
@@ -1654,6 +1748,9 @@ def runQBProj(playerFirst, playerLast, pposition, oppTeam,oppTeamABR,loc, player
     print ("to add to coeff " ,new_val)
     pass_coeff = pass_coeff + new_val
     print("Coeff ", pass_coeff)
+
+    confidence = mean_confidence_interval(recent_games_pass_yds)
+
     #rush yards
     yvalues = range(len(historical_rushyrds))
     val = linReg(yvalues, historical_rushyrds)[0]
@@ -1837,6 +1934,11 @@ def runQBProj(playerFirst, playerLast, pposition, oppTeam,oppTeamABR,loc, player
         totalrating = totalrating/count
         totalpassyards = totalpassyards/count
         totalpasstds = totalpasstds/count
+    
+    player_w_l_splits = ps.win_loss(player = playerName, position = pposition, season = 2022, avg = True)
+    teamWinProb = fpi_values[playerTeam]
+    oppTeamWin = fpi_values[oppTeamABR]
+    win_loss_split = win_loss_calc (teamWinProb, oppTeamWin, player_w_l_splits, pposition)
 
     if count > 1:
         # ----- Previous Similar Games ----- #
@@ -1945,7 +2047,7 @@ def runQBProj(playerFirst, playerLast, pposition, oppTeam,oppTeamABR,loc, player
             "cmp": historical_cmp_proj,
             "int": historical_int_proj,
             "rating": historical_rating_proj,
-            "weight" : 0.5
+            "weight" : 0.35
             },
         }
     
@@ -1973,6 +2075,7 @@ def runQBProj(playerFirst, playerLast, pposition, oppTeam,oppTeamABR,loc, player
     rush_att_full = rush_att_full + ((hist_avg['recent_projection']["rush_attempts"] *hist_avg['recent_projection']["weight"])*rushing_coeff)
     rush_att_full = rush_att_full + ((reg_avgs['recent_projection']["rush_attempts"] *reg_avgs['recent_projection']["weight"])*rushing_coeff)
     rush_att_full = rush_att_full + ((avgs['recent_projection']["rush_attempts"] *avgs['recent_projection']["weight"])*rushing_coeff)
+    rush_att_full = rush_att_full + ((win_loss_split['recent_projection']["rush_attempts"] *win_loss_split['recent_projection']["weight"])*rushing_coeff)
 
     #----rush tds----#
     rush_tds_full = 0
@@ -1980,6 +2083,7 @@ def runQBProj(playerFirst, playerLast, pposition, oppTeam,oppTeamABR,loc, player
     rush_tds_full = rush_tds_full + (hist_avg['recent_projection']["rush_tds"] *hist_avg['recent_projection']["weight"])
     rush_tds_full = rush_tds_full + (reg_avgs['recent_projection']["rush_tds"] *reg_avgs['recent_projection']["weight"])
     rush_tds_full = rush_tds_full + (avgs['recent_projection']["rush_tds"] *avgs['recent_projection']["weight"])
+    rush_tds_full = rush_tds_full + ((win_loss_split['recent_projection']["rush_tds"] *win_loss_split['recent_projection']["weight"])*rushing_coeff)
 
     #----rush yds----#
     rush_yds_full = 0
@@ -1987,6 +2091,7 @@ def runQBProj(playerFirst, playerLast, pposition, oppTeam,oppTeamABR,loc, player
     rush_yds_full = rush_yds_full + ((hist_avg['recent_projection']["rush_yards"] *hist_avg['recent_projection']["weight"]) * rushing_coeff)
     rush_yds_full = rush_yds_full + ((reg_avgs['recent_projection']["rush_yards"] *reg_avgs['recent_projection']["weight"]) * rushing_coeff)
     rush_yds_full = rush_yds_full + ((avgs['recent_projection']["rush_yards"] *avgs['recent_projection']["weight"])*rushing_coeff)
+    rush_yds_full = rush_yds_full + ((win_loss_split['recent_projection']["rush_yards"] *win_loss_split['recent_projection']["weight"])*rushing_coeff)
 
     #---- completions ----#
     cmp_full = 0
@@ -1994,6 +2099,7 @@ def runQBProj(playerFirst, playerLast, pposition, oppTeam,oppTeamABR,loc, player
     cmp_full = cmp_full + ((hist_avg['recent_projection']["cmp"] *hist_avg['recent_projection']["weight"])*pass_coeff)
     cmp_full = cmp_full + ((reg_avgs['recent_projection']["cmp"] *reg_avgs['recent_projection']["weight"])*pass_coeff)
     cmp_full = cmp_full + ((avgs['recent_projection']["cmp"] *avgs['recent_projection']["weight"])*pass_coeff)
+    cmp_full = cmp_full + ((win_loss_split['recent_projection']["cmp"] *win_loss_split['recent_projection']["weight"])*pass_coeff)
 
     #---- att ----#
     att_full = 0
@@ -2008,6 +2114,7 @@ def runQBProj(playerFirst, playerLast, pposition, oppTeam,oppTeamABR,loc, player
     int_full = int_full + ((hist_avg['recent_projection']["int"] *hist_avg['recent_projection']["weight"]))
     int_full = int_full + ((reg_avgs['recent_projection']["int"] *reg_avgs['recent_projection']["weight"]))
     int_full = int_full + ((avgs['recent_projection']["int"] *avgs['recent_projection']["weight"]))
+    int_full = int_full + ((win_loss_split['recent_projection']["int"] *win_loss_split['recent_projection']["weight"])*pass_coeff)
 
     #---- rating ----#
     rating_full = 0
@@ -2022,6 +2129,8 @@ def runQBProj(playerFirst, playerLast, pposition, oppTeam,oppTeamABR,loc, player
     pass_yds_full = pass_yds_full + ((hist_avg['recent_projection']["pass_yards"] *hist_avg['recent_projection']["weight"])*pass_coeff)
     pass_yds_full = pass_yds_full + ((reg_avgs['recent_projection']["pass_yards"] *reg_avgs['recent_projection']["weight"])*pass_coeff)
     pass_yds_full = pass_yds_full + ((avgs['recent_projection']["pass_yards"] *avgs['recent_projection']["weight"])*pass_coeff)
+    pass_yds_full = pass_yds_full + ((win_loss_split['recent_projection']["pass_yards"] *win_loss_split['recent_projection']["weight"])*pass_coeff)
+    
 
     #----pass tds----#
     pass_tds_full = 0
@@ -2029,6 +2138,7 @@ def runQBProj(playerFirst, playerLast, pposition, oppTeam,oppTeamABR,loc, player
     pass_tds_full = pass_tds_full + (hist_avg['recent_projection']["pass_tds"] *hist_avg['recent_projection']["weight"])
     pass_tds_full = pass_tds_full + (reg_avgs['recent_projection']["pass_tds"] *reg_avgs['recent_projection']["weight"])
     pass_tds_full = pass_tds_full + (avgs['recent_projection']["pass_tds"] *avgs['recent_projection']["weight"])
+    pass_tds_full = pass_tds_full + ((win_loss_split['recent_projection']["pass_tds"] *win_loss_split['recent_projection']["weight"])*pass_coeff)
 
 
 
@@ -2037,6 +2147,9 @@ def runQBProj(playerFirst, playerLast, pposition, oppTeam,oppTeamABR,loc, player
     arr = [rush_att_full, rush_yds_full, rush_tds_full, att_full, cmp_full, int_full, pass_yds_full, pass_tds_full, rating_full ]
     
     output = pd.DataFrame(np.array([arr]), columns=['Rush Attempts:', 'Rush Yards:', 'Rush Tds:', "Attemps", "Completions", "ints", "Pass Yards", "Pass Tds", "rating"])
+    print(output)
+
+    print("confidence for yards: ", confidence)
 
     saveprojection = {
         playerName: {

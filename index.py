@@ -3,6 +3,8 @@ from pro_football_reference_web_scraper import player_splits as ps
 from pro_football_reference_web_scraper import team_splits as t
 from pro_football_reference_web_scraper import team_game_log as tg
 import pandas as pd
+from sklearn import preprocessing, svm
+from sklearn.model_selection import train_test_split
 import numpy as np
 import scipy.stats
 from scipy import stats
@@ -10,6 +12,14 @@ from sklearn import datasets, svm
 from sklearn.linear_model import LinearRegression
 import PySimpleGUI as sg
 import json
+from numpy.polynomial.polynomial import polyfit
+import matplotlib.pyplot as plt
+import math
+from sklearn.model_selection import train_test_split
+from sklearn.linear_model import LinearRegression
+from sklearn.tree import DecisionTreeRegressor
+from sklearn.neural_network import MLPRegressor
+from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 
 sg.theme('BluePurple')
 
@@ -173,6 +183,22 @@ def linearRegPredict(predictVal, xval, yval):
 
     projection_X = 5
     length = len(np.array(xval))
+  #  xval2 = xval.tolist()
+  #  xval2.pop(0)
+  #  xval2 = np.array(xval2)
+  #  X = preprocessing.scale(xval2)
+  #  X = X.reshape(8, 2)
+ #   print("PREPROCCESS: ", X)
+ #   yval2 = np.array([1,2,3,4,5,6,7,8])
+  #  print(yval2)
+  #  X_train, X_test, y_train, y_test = train_test_split(np.array(X), yval2, test_size=0.6)
+  #  lr = LinearRegression(n_jobs=-1)
+  #  lr.fit(X_train, y_train)
+  #  confidence = lr.score(X_test, y_test)
+  #  predic = lr.predict(np.array(X))
+  #  print("Predict", predic)
+  #  print("X, Y: ", X_test, y_test)
+  #  print("CONFIDENCE: ", confidence)
 
     #Project Based on trend
     if predictVal > 0.25 and predictVal < 0.5:
@@ -196,12 +222,62 @@ def linearRegPredict(predictVal, xval, yval):
     lr = LinearRegression()
     lr.fit(np.array(yval).reshape(-1,1), np.array(xval).reshape(-1,1))
     projected_value = lr.predict(np.array([projection_X]).reshape(-1,1))
-
     print("Coeff: ", predictVal, "\nProjection x val: ", projection_X, "\nProjection: ", projected_value)
 
     return projected_value
 
+# plot values and projection
+def plotGraph(player_game_log, colname):
+    
+    df = player_game_log[['date','week','team','game_location','opp','result','team_pts','opp_pts','tgt','rec','rec_yds','rec_td','snap_pct']]
+    forecast_col = colname
+    forecast_out = int(math.ceil(0.01 * len(df)))
+    print("out: ", forecast_out)
+    df['label'] = df[forecast_col]
 
+    print(df)
+    print("DF LABEL: ", df['label'])
+    df2 = df['label']
+    X = np.array(range(len(df2))).reshape(-1, 1)
+
+    print(X)
+    X = preprocessing.scale(X)
+    X_lately = X[-forecast_out:]
+    #X = X[:-forecast_out]
+    print("LATELY", X_lately)
+
+    df.dropna(inplace=True)
+
+    y = np.array(df['label'])
+
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3)
+    clf = LinearRegression(n_jobs=-1)
+    clf.fit(X_train, y_train)
+    print( X_train, X_test, y_train, y_test)
+    confidence = clf.score(X_test, y_test)
+    print(confidence)
+    forecast_set = clf.predict(X_lately)
+    print("FORECAST SET", forecast_set)
+    df['Forecast'] = np.nan
+
+    last_date = df.iloc[-1].name
+    print(last_date)
+    next_date = last_date+1
+    for i in forecast_set:
+        df.loc[next_date] = [np.nan for _ in range(len(df.columns)-1)]+[i]
+        next_date += 1
+        print(next_date)
+
+    print(df)
+    df[colname].plot()
+    df['Forecast'].plot()
+    plt.legend(loc=4)
+    plt.xlabel('Games')
+    plt.ylabel('Yards')
+    plt.show()
+
+#player_game_log = p.get_player_game_log(player = "David Njoku", position = "TE", season = 2022)
+#plotGraph(player_game_log, "rec_yds")
 #confidence interval function
 def mean_confidence_interval(data, confidence=0.80):
     a = 1.0 * np.array(data)
@@ -558,6 +634,11 @@ def runRbProj(playerFirst, playerLast, pposition, oppTeam,oppTeamABR,loc, player
     rectdTrend = []
     targTrend = []
     recyrdTrend = []
+
+    recent_confidence = mean_confidence_interval(recent_games_rushyrds)
+    historical_confidence = mean_confidence_interval(historical_rushyrds)
+
+    confidence = [(recent_confidence[0]*0.75) + (historical_confidence[0]*0.25), (recent_confidence[1]*0.75) + (historical_confidence[1]*0.25), (recent_confidence[2]*0.75) + (historical_confidence[2]*0.25)]
 
     for game in prevGames:
 
@@ -946,7 +1027,6 @@ def runWRProj(playerFirst, playerLast, pposition, oppTeam,oppTeamABR,loc, player
 
     rec_coeff = defensive_ru_allowed/rushing_average
 
-
     # ---- Get ready to store historical data ---- #
     historical_rec = []
     historical_snap_pct = []
@@ -1252,10 +1332,20 @@ def runWRProj(playerFirst, playerLast, pposition, oppTeam,oppTeamABR,loc, player
     targTrend = []
     recyrdTrend = []
 
-    confidence = mean_confidence_interval(recent_games_recyrds)
-    #historical_confidence = mean_confidence_interval(historical_recyrds)
+    #yards confidence interval
+    recent_confidence = mean_confidence_interval(recent_games_recyrds)
+    historical_confidence = mean_confidence_interval(historical_recyrds)
 
-    #confidence = [(recent_confidence[0]/2) + (historical_confidence[0]/2), (recent_confidence[1]/2) + (historical_confidence[1]/2), (recent_confidence[2]/2) + (historical_confidence[2]/2)]
+    confidence = [(recent_confidence[0]*0.75) + (historical_confidence[0]*0.25), (recent_confidence[1]*0.75) + (historical_confidence[1]*0.25), (recent_confidence[2]*0.75) + (historical_confidence[2]*0.25)]
+
+    #receptions confidence interval
+    recent_confidence = mean_confidence_interval(recent_games_rec)
+    historical_confidence = mean_confidence_interval(historical_rec)
+
+    rec_confidence = [(recent_confidence[0]*0.75) + (historical_confidence[0]*0.25), (recent_confidence[1]*0.75) + (historical_confidence[1]*0.25), (recent_confidence[2]*0.75) + (historical_confidence[2]*0.25)]
+
+    print("Rec Conf: ", rec_confidence)
+
 
     for game in prevGames:
 
@@ -1749,7 +1839,26 @@ def runQBProj(playerFirst, playerLast, pposition, oppTeam,oppTeamABR,loc, player
     pass_coeff = pass_coeff + new_val
     print("Coeff ", pass_coeff)
 
-    confidence = mean_confidence_interval(recent_games_pass_yds)
+    #Calc Confidence intervals
+    recent_confidence = mean_confidence_interval(recent_games_pass_yds)
+    historical_confidence = mean_confidence_interval(historical_pass_yds)
+
+    confidence = [(recent_confidence[0]*0.75) + (historical_confidence[0]*0.25), (recent_confidence[1]*0.75) + (historical_confidence[1]*0.25), (recent_confidence[2]*0.75) + (historical_confidence[2]*0.25)]
+
+    #pass Tds
+    recent_confidence = mean_confidence_interval(recent_games_pass_td)
+    historical_confidence = mean_confidence_interval(historical_pass_td)
+
+    td_confidence = [(recent_confidence[0]*0.75) + (historical_confidence[0]*0.25), (recent_confidence[1]*0.75) + (historical_confidence[1]*0.25), (recent_confidence[2]*0.75) + (historical_confidence[2]*0.25)]
+
+    #rush yards
+    recent_confidence = mean_confidence_interval(recent_games_rushyrds)
+    historical_confidence = mean_confidence_interval(historical_rushyrds)
+
+    rush_confidence = [(recent_confidence[0]*0.75) + (historical_confidence[0]*0.25), (recent_confidence[1]*0.75) + (historical_confidence[1]*0.25), (recent_confidence[2]*0.75) + (historical_confidence[2]*0.25)]
+
+    print("Pass TD Conf: ", td_confidence)
+    print("Rush Yards Conf: ", rush_confidence)
 
     #rush yards
     yvalues = range(len(historical_rushyrds))

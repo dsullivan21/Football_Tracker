@@ -227,9 +227,11 @@ def linearRegPredict(predictVal, xval, yval):
     return projected_value
 
 # plot values and projection
-def plotGraph(player_game_log, colname):
-    
-    df = player_game_log[['date','week','team','game_location','opp','result','team_pts','opp_pts','tgt','rec','rec_yds','rec_td','snap_pct']]
+def plotGraph(player_game_log, colname, ppos):
+    if ppos == "WR" or ppos == "TE":
+        df = player_game_log[['date','week','team','game_location','opp','result','team_pts','opp_pts','tgt','rec','rec_yds','rec_td','snap_pct']]
+    elif ppos == "RB":
+         df = player_game_log[['date','week','team','game_location','opp','result','team_pts','opp_pts','rush_att','rush_yds','rush_td','tgt','rec_yds', 'rec_td']]
     forecast_col = colname
     forecast_out = int(math.ceil(0.01 * len(df)))
     print("out: ", forecast_out)
@@ -269,12 +271,7 @@ def plotGraph(player_game_log, colname):
         print(next_date)
 
     print(df)
-    df[colname].plot()
-    df['Forecast'].plot()
-    plt.legend(loc=4)
-    plt.xlabel('Games')
-    plt.ylabel('Yards')
-    plt.show()
+    return forecast_set
 
 #player_game_log = p.get_player_game_log(player = "David Njoku", position = "TE", season = 2022)
 #plotGraph(player_game_log, "rec_yds")
@@ -341,17 +338,36 @@ def runRbProj(playerFirst, playerLast, pposition, oppTeam,oppTeamABR,loc, player
     historical_recyrds = []
     historical_rectds = []
 
-    i = 2022
+    recent_games_rushatt=[]
+    recent_games_rushyrds=[]
+    recent_games_rushtds=[]
+    recent_games_targets=[]
+    recent_games_recyrds=[]
+    recent_games_rectds=[]
+    forecast_pick = -1
+    dfLive = True
+
+    i = 2023
     #search through last 4 years data
     while (i >= 2019):
     
         try:
             player_game_log = p.get_player_game_log(player = playerName, position = pposition, season = i)
+            dfLive = True
         except:             
             print("player didnt return a result")
+            dfLive = False
 
         # ---- Get data from all games for recent games trend ---- #
-        if i == 2022:
+        if i == 2023 and dfLive == True:
+            playerTeam = player_game_log.loc[0]['team']
+            recent_games_rushatt.extend( player_game_log.loc[:,'rush_att'].values)
+            recent_games_rushyrds.extend(player_game_log.loc[:,'rush_yds'].values)
+            recent_games_rushtds.extend(player_game_log.loc[:,'rush_td'].values)
+            recent_games_targets.extend(player_game_log.loc[:,'tgt'].values)
+            recent_games_recyrds.extend(player_game_log.loc[:,'rec_yds'].values)
+            recent_games_rectds.extend(player_game_log.loc[:,'rec_td'].values)
+        elif i == 2022 and dfLive == True:
             recent_games_rushatt = player_game_log.loc[:,'rush_att'].values
             recent_games_rushyrds = player_game_log.loc[:,'rush_yds'].values
             recent_games_rushtds = player_game_log.loc[:,'rush_td'].values
@@ -365,8 +381,10 @@ def runRbProj(playerFirst, playerLast, pposition, oppTeam,oppTeamABR,loc, player
             historical_rushatt.extend(player_game_log.loc[:,'rush_att'].values)
             historical_targets.extend( player_game_log.loc[:,'tgt'].values)
             # Get player team
-            playerTeam = player_game_log.loc[1]['team']
-        else:
+            if playerTeam == "":
+                playerTeam = player_game_log.loc[0]['team']
+            forecast_pick = plotGraph(player_game_log, "rush_yds", "RB")
+        elif dfLive == True:
             historical_rectds.extend(player_game_log.loc[:,'rec_td'].values)
             historical_recyrds.extend(player_game_log.loc[:,'rec_yds'].values)
             historical_rushyrds.extend(player_game_log.loc[:,'rush_yds'].values)
@@ -861,6 +879,14 @@ def runRbProj(playerFirst, playerLast, pposition, oppTeam,oppTeamABR,loc, player
     allData.extend(hist_avg)
     allData.extend(recent_avg)
 
+    #confidence for rec yards
+    recent_confidence = mean_confidence_interval(recent_games_recyrds)
+    historical_confidence = mean_confidence_interval(historical_recyrds)
+
+    confidence_rec = [(recent_confidence[0]*0.75) + (historical_confidence[0]*0.25), (recent_confidence[1]*0.75) + (historical_confidence[1]*0.25), (recent_confidence[2]*0.75) + (historical_confidence[2]*0.25)]
+
+    print("REC YARD CONF: ", confidence_rec)
+
     # -- CALCULATE PROJECTION -- #
 
     #----rush attempts----#
@@ -934,10 +960,15 @@ def runRbProj(playerFirst, playerLast, pposition, oppTeam,oppTeamABR,loc, player
 
     print(allData)
 
+    print(forecast_pick[0])
+    if forecast_pick > 0:
+        rush_yds_full = (rush_yds_full * 0.75) + (forecast_pick[0] *0.25)
+    
+
     arr = [rush_att_full, rush_yds_full, rush_tds_full, tgt_full, rec_yds_full, rec_tds_full]
 
     saveprojection = {
-        playerName: {
+        playerName:{
             'Rush Attempts': rush_att_full,
             'Rush Yards:': rush_yds_full,
             'Rush Tds': rush_tds_full,
@@ -946,6 +977,14 @@ def runRbProj(playerFirst, playerLast, pposition, oppTeam,oppTeamABR,loc, player
             'Rec Tds' : rec_tds_full
         }
     }
+
+    with open('data.json') as f:
+        data = json.load(f)
+
+    data[playerName] = saveprojection
+
+    with open('data.json', 'w') as f:
+        json.dump(data, f, indent=2)
 
     all_projections.append(saveprojection)
     
@@ -1043,6 +1082,7 @@ def runWRProj(playerFirst, playerLast, pposition, oppTeam,oppTeamABR,loc, player
     dfLive = True
 
     i = 2023
+    forecast_pick = -1
     #search through last 4 years data
     while (i >= 2019):
     
@@ -1075,6 +1115,7 @@ def runWRProj(playerFirst, playerLast, pposition, oppTeam,oppTeamABR,loc, player
             historical_snap_pct.extend(player_game_log.loc[:,'snap_pct'].values)
             historical_rec.extend(player_game_log.loc[:,'rec'].values)
             historical_targets.extend( player_game_log.loc[:,'tgt'].values)
+            forecast_pick = plotGraph(player_game_log, "rec_yds", "WR")
         elif dfLive == True:
             historical_rectds.extend(player_game_log.loc[:,'rec_td'].values)
             historical_recyrds.extend(player_game_log.loc[:,'rec_yds'].values)
@@ -1611,8 +1652,12 @@ def runWRProj(playerFirst, playerLast, pposition, oppTeam,oppTeamABR,loc, player
         rec_tds_full = rec_tds_full + ((allreg_avgs['recent_projection']["rec_tds"] *allreg_avgs['recent_projection']["weight"])*rec_coeff)
 
 
-
+    print(rec_coeff)
     print(allData)
+    print(forecast_pick[0])
+
+    if forecast_pick > 0:
+        rec_yds_full = (rec_yds_full * 0.8) + (forecast_pick[0] *0.2)
 
     arr = [rec_full, snap_pct_full, tgt_full, rec_yds_full, rec_tds_full]
 
@@ -1622,13 +1667,23 @@ def runWRProj(playerFirst, playerLast, pposition, oppTeam,oppTeamABR,loc, player
             "Snap Count": snap_pct_full,
             'Targets': tgt_full,
             'Rec Yards': rec_yds_full,
-            'Rec Tds': rec_tds_full
+            'Rec Tds': rec_tds_full,
+            'Conf Interval': confidence
         }
     }
 
     all_projections.append(saveprojection)
     
     output = pd.DataFrame(np.array([arr]), columns=['Receptions: ', 'Snap Count:',"Targets", "Recieving Yards", "Rec Tds"])
+
+
+    with open('data.json') as f:
+        data = json.load(f)
+
+    data[playerName] = saveprojection
+
+    with open('data.json', 'w') as f:
+        json.dump(data, f)  
 
     #Print prev game data
     if count > 1:

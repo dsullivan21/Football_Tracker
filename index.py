@@ -19,6 +19,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LinearRegression
 from sklearn.tree import DecisionTreeRegressor
 from sklearn.neural_network import MLPRegressor
+from sklearn.metrics import r2_score
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 
 sg.theme('BluePurple')
@@ -227,11 +228,24 @@ def linearRegPredict(predictVal, xval, yval):
     return projected_value
 
 # plot values and projection
-def plotGraph(player_game_log, colname, ppos):
+def plotGraph(player_game_log, colname, ppos, loglast):
+
     if ppos == "WR" or ppos == "TE":
-        df = player_game_log[['date','week','team','game_location','opp','result','team_pts','opp_pts','tgt','rec','rec_yds','rec_td','snap_pct']]
+        if (len(player_game_log) > 0):
+            df = player_game_log[['date','week','team','game_location','opp','result','team_pts','opp_pts','tgt','rec','rec_yds','rec_td','snap_pct']]
+            dflast = loglast[['date','week','team','game_location','opp','result','team_pts','opp_pts','tgt','rec','rec_yds','rec_td','snap_pct']]
+            df = pd.concat([dflast, df], ignore_index=True)
+        else:
+            df = loglast[['date','week','team','game_location','opp','result','team_pts','opp_pts','tgt','rec','rec_yds','rec_td','snap_pct']]
     elif ppos == "RB":
-         df = player_game_log[['date','week','team','game_location','opp','result','team_pts','opp_pts','rush_att','rush_yds','rush_td','tgt','rec_yds', 'rec_td']]
+        df = player_game_log[['date','week','team','game_location','opp','result','team_pts','opp_pts','rush_att','rush_yds','rush_td','tgt','rec_yds', 'rec_td']]
+        dflast = loglast[['date','week','team','game_location','opp','result','team_pts','opp_pts','rush_att','rush_yds','rush_td','tgt','rec_yds', 'rec_td']]
+        df = pd.concat([dflast, df], ignore_index=True)
+    elif ppos == "QB":
+        df = player_game_log[['date','week','team','game_location','opp','result','team_pts','opp_pts','cmp', 'att', 'pass_yds', 'pass_td','int','rating','sacked','rush_att','rush_yds','rush_td']]
+        dflast = loglast[['date','week','team','game_location','opp','result','team_pts','opp_pts','cmp', 'att', 'pass_yds', 'pass_td','int','rating','sacked','rush_att','rush_yds','rush_td']]
+        df = pd.concat([dflast, df], ignore_index=True)
+            
     forecast_col = colname
     forecast_out = int(math.ceil(0.01 * len(df)))
     print("out: ", forecast_out)
@@ -257,6 +271,7 @@ def plotGraph(player_game_log, colname, ppos):
     clf.fit(X_train, y_train)
     print( X_train, X_test, y_train, y_test)
     confidence = clf.score(X_test, y_test)
+
     print(confidence)
     forecast_set = clf.predict(X_lately)
     print("FORECAST SET", forecast_set)
@@ -270,7 +285,7 @@ def plotGraph(player_game_log, colname, ppos):
         next_date += 1
         print(next_date)
 
-    print(df)
+
     return forecast_set
 
 #player_game_log = p.get_player_game_log(player = "David Njoku", position = "TE", season = 2022)
@@ -347,6 +362,9 @@ def runRbProj(playerFirst, playerLast, pposition, oppTeam,oppTeamABR,loc, player
     forecast_pick = -1
     dfLive = True
 
+    log2023 = ""
+    log2022 = ""
+
     i = 2023
     #search through last 4 years data
     while (i >= 2019):
@@ -367,6 +385,7 @@ def runRbProj(playerFirst, playerLast, pposition, oppTeam,oppTeamABR,loc, player
             recent_games_targets.extend(player_game_log.loc[:,'tgt'].values)
             recent_games_recyrds.extend(player_game_log.loc[:,'rec_yds'].values)
             recent_games_rectds.extend(player_game_log.loc[:,'rec_td'].values)
+            log2023 = player_game_log
         elif i == 2022 and dfLive == True:
             recent_games_rushatt = player_game_log.loc[:,'rush_att'].values
             recent_games_rushyrds = player_game_log.loc[:,'rush_yds'].values
@@ -380,10 +399,10 @@ def runRbProj(playerFirst, playerLast, pposition, oppTeam,oppTeamABR,loc, player
             historical_rushtds.extend(player_game_log.loc[:,'rush_td'].values)
             historical_rushatt.extend(player_game_log.loc[:,'rush_att'].values)
             historical_targets.extend( player_game_log.loc[:,'tgt'].values)
+            log2022 = player_game_log
             # Get player team
             if playerTeam == "":
                 playerTeam = player_game_log.loc[0]['team']
-            forecast_pick = plotGraph(player_game_log, "rush_yds", "RB")
         elif dfLive == True:
             historical_rectds.extend(player_game_log.loc[:,'rec_td'].values)
             historical_recyrds.extend(player_game_log.loc[:,'rec_yds'].values)
@@ -460,6 +479,10 @@ def runRbProj(playerFirst, playerLast, pposition, oppTeam,oppTeamABR,loc, player
         i = i -1
 
         #END WHILE#
+
+    prds = plotGraph(log2023, "rush_yds", "RB", log2022)
+    precyds = plotGraph(log2023, "rec_yds", "RB", log2022)
+
         #---------- CALCULATE HISTORICAL MODEL ----------#
     ru_allowed = (ru_d_av_w * (oppWinProb/100)) + (ru_d_av_l * (fpi_values[playerTeam]/100))
 
@@ -959,11 +982,13 @@ def runRbProj(playerFirst, playerLast, pposition, oppTeam,oppTeamABR,loc, player
 
 
     print(allData)
-
-    print(forecast_pick[0])
-    if forecast_pick > 0:
-        rush_yds_full = (rush_yds_full * 0.75) + (forecast_pick[0] *0.25)
     
+    rec_yds_full = (rec_yds_full * 0.8) + (precyds.item()*0.2)
+    rush_yds_full = (rush_yds_full * 0.8) + (prds.item()*0.2)
+
+    print("REc fore: ",precyds.item())
+    print("Rush fore: ",prds.item())
+
 
     arr = [rush_att_full, rush_yds_full, rush_tds_full, tgt_full, rec_yds_full, rec_tds_full]
 
@@ -1035,6 +1060,7 @@ def runWRProj(playerFirst, playerLast, pposition, oppTeam,oppTeamABR,loc, player
     t.home_road(team = oppTeam, season = 2022, avg = True)
 
     opp_games = tg.get_team_game_log(team = oppTeam, season = 2022)
+    #opp_games2 = tg.get_team_game_log(team = oppTeam, season = 2023)
     opp_splits = t.home_road(team = oppTeam, season = 2022, avg = True)
 
     print(opp_games)
@@ -1079,6 +1105,9 @@ def runWRProj(playerFirst, playerLast, pposition, oppTeam,oppTeamABR,loc, player
     recent_games_recyrds = []
     recent_games_rectds = []
 
+    y2023log = ""
+    y2022log = ""
+
     dfLive = True
 
     i = 2023
@@ -1102,6 +1131,7 @@ def runWRProj(playerFirst, playerLast, pposition, oppTeam,oppTeamABR,loc, player
             recent_games_targets.extend(player_game_log.loc[:,'tgt'].values)
             recent_games_recyrds.extend(player_game_log.loc[:,'rec_yds'].values)
             recent_games_rectds.extend(player_game_log.loc[:,'rec_td'].values)
+            y2023log = player_game_log
         elif i == 2022 and dfLive == True:
             if playerTeam == "":
                 playerTeam = player_game_log.loc[0]['team']
@@ -1115,7 +1145,7 @@ def runWRProj(playerFirst, playerLast, pposition, oppTeam,oppTeamABR,loc, player
             historical_snap_pct.extend(player_game_log.loc[:,'snap_pct'].values)
             historical_rec.extend(player_game_log.loc[:,'rec'].values)
             historical_targets.extend( player_game_log.loc[:,'tgt'].values)
-            forecast_pick = plotGraph(player_game_log, "rec_yds", "WR")
+            y2022log = player_game_log
         elif dfLive == True:
             historical_rectds.extend(player_game_log.loc[:,'rec_td'].values)
             historical_recyrds.extend(player_game_log.loc[:,'rec_yds'].values)
@@ -1187,6 +1217,12 @@ def runWRProj(playerFirst, playerLast, pposition, oppTeam,oppTeamABR,loc, player
 
         #END WHILE#
         #---------- CALCULATE HISTORICAL MODEL ----------#
+
+    prec = plotGraph(y2023log, "rec", "WR", y2022log)
+    ptds = plotGraph(y2023log, "rec_td", "WR", y2022log)
+    pryds = plotGraph(y2023log, "rec_yds", "WR", y2022log)
+    ptgt = plotGraph(y2023log, "tgt", "WR", y2022log)
+
     #snap count
     yvalues = range(len(historical_snap_pct))
     val = linReg(yvalues, historical_snap_pct)[0]
@@ -1654,7 +1690,18 @@ def runWRProj(playerFirst, playerLast, pposition, oppTeam,oppTeamABR,loc, player
 
     print(rec_coeff)
     print(allData)
-    print(forecast_pick[0])
+
+    print("Forecast rec yards: ", pryds)
+    print("Forecast tds: ", ptds)
+    print("Forecast rec: ", prec)
+    print("Forecast tgt: ", ptgt)
+
+    print("forecast: ", type(pryds))
+
+    rec_tds_full = (rec_tds_full *0.8) + (ptds.item() * 0.2)
+    rec_yds_full = (rec_yds_full *0.8) + (pryds.item() * 0.2)
+    tgt_full = (tgt_full*0.8) + (ptgt.item() *0.2)
+    rec_full = (rec_full*0.8) + (prec.item() *0.2)
 
     if forecast_pick > 0:
         rec_yds_full = (rec_yds_full * 0.8) + (forecast_pick[0] *0.2)
@@ -1774,6 +1821,9 @@ def runQBProj(playerFirst, playerLast, pposition, oppTeam,oppTeamABR,loc, player
     rushing_coeff = defensive_ru_allowed/rushing_average
 
     # ---- Get ready to store historical data ---- #
+
+    log2023 = None
+    log2022 = None
     historical_rushatt = []
     historical_rushyrds = []
     historical_rushtds = []
@@ -1784,27 +1834,60 @@ def runQBProj(playerFirst, playerLast, pposition, oppTeam,oppTeamABR,loc, player
     historical_rating = []
     historical_pass_yds = []
 
-    i = 2022
+    recent_games_rushatt = []
+    recent_games_rushyrds = []
+    recent_games_rushtds = []
+    recent_games_cmp = []
+    recent_games_att = []
+    recent_games_pass_td = []
+    recent_games_int = []
+    recent_games_rating = []
+    recent_games_pass_yds = []
+    dfLive = True
+    playerTeam = ""
+
+    i = 2023
+    forecast_pick = -1
+
     #search through last 4 years data
     while (i >= 2019):
     
         try:
             player_game_log = p.get_player_game_log(player = playerName, position = pposition, season = i)
+            dfLive = True
         except:
             print("player didnt return a result")
+            dfLive = False
 
         # ---- Get data from all games for recent games trend ---- #
-        if i == 2022:
-            recent_games_rushatt = player_game_log.loc[:,'rush_att'].values
-            recent_games_rushyrds = player_game_log.loc[:,'rush_yds'].values
-            recent_games_rushtds = player_game_log.loc[:,'rush_td'].values
-            recent_games_cmp = player_game_log.loc[:,'cmp'].values
-            recent_games_att = player_game_log.loc[:,'att'].values
-            recent_games_pass_td = player_game_log.loc[:,'pass_td'].values
-            recent_games_int = player_game_log.loc[:,'int'].values
-            recent_games_rating = player_game_log.loc[:,'rating'].values
-            recent_games_pass_yds = player_game_log.loc[:, 'pass_yds'].values
+        if i == 2023 and dfLive:
             playerTeam = player_game_log.loc[0]['team']
+            y2023_rushatt = player_game_log.loc[:,'rush_att'].values
+            y2023_rushyrds = player_game_log.loc[:,'rush_yds'].values
+            y2023_rushtds = player_game_log.loc[:,'rush_td'].values
+            y2023_cmp = player_game_log.loc[:,'cmp'].values
+            y2023_att = player_game_log.loc[:,'att'].values
+            y2023_pass_td = player_game_log.loc[:,'pass_td'].values
+            y2023_int = player_game_log.loc[:,'int'].values
+            y2023_rating = player_game_log.loc[:,'rating'].values
+            y2023_pass_yds = player_game_log.loc[:,'pass_yds'].values
+            log2023 = player_game_log
+            print(player_game_log)
+
+        elif i == 2022 and dfLive:
+            recent_games_rushatt.extend(player_game_log.loc[:,'rush_att'].values)
+            recent_games_rushyrds.extend(player_game_log.loc[:,'rush_yds'].values)
+            recent_games_rushtds.extend(player_game_log.loc[:,'rush_td'].values)
+            recent_games_cmp.extend(player_game_log.loc[:,'cmp'].values)
+            recent_games_att.extend(player_game_log.loc[:,'att'].values)
+            recent_games_pass_td.extend(player_game_log.loc[:,'pass_td'].values)
+            recent_games_int.extend(player_game_log.loc[:,'int'].values)
+            recent_games_rating.extend(player_game_log.loc[:,'rating'].values)
+            recent_games_pass_yds.extend(player_game_log.loc[:, 'pass_yds'].values)
+            log2022 = player_game_log
+            print(player_game_log)
+            if playerTeam == "":
+                playerTeam = player_game_log.loc[0]['team']
             
             historical_rushyrds.extend(player_game_log.loc[:,'rush_yds'].values)
             historical_int.extend(player_game_log.loc[:,'int'].values)
@@ -1815,7 +1898,8 @@ def runQBProj(playerFirst, playerLast, pposition, oppTeam,oppTeamABR,loc, player
             historical_pass_td.extend( player_game_log.loc[:,'pass_td'].values)
             historical_pass_yds.extend( player_game_log.loc[:,'pass_yds'].values)
             historical_rating.extend( player_game_log.loc[:,'rating'].values)
-        else:
+            print(player_game_log)
+        elif dfLive:
             historical_rushyrds.extend(player_game_log.loc[:,'rush_yds'].values)
             historical_int.extend(player_game_log.loc[:,'int'].values)
             historical_cmp.extend(player_game_log.loc[:,'cmp'].values)
@@ -1825,6 +1909,7 @@ def runQBProj(playerFirst, playerLast, pposition, oppTeam,oppTeamABR,loc, player
             historical_pass_td.extend( player_game_log.loc[:,'pass_td'].values)
             historical_pass_yds.extend( player_game_log.loc[:,'pass_yds'].values)
             historical_rating.extend( player_game_log.loc[:,'rating'].values)
+            print(player_game_log)
 
         isGame = False
 
@@ -1886,6 +1971,26 @@ def runQBProj(playerFirst, playerLast, pposition, oppTeam,oppTeamABR,loc, player
     print("Loss: ", pass_d_l)
     print("passing avg: ", passing_average)
     print ("Passing allowed average " ,passing_allowed)
+
+    # CALC 2023 data
+    pyds = plotGraph(log2023, "pass_yds", "QB", log2022)
+    ptds = plotGraph(log2023, "pass_td", "QB", log2022)
+    pints = plotGraph(log2023, "int", "QB", log2022)
+    prds = plotGraph(log2023, "rush_yds", "QB", log2022)
+
+    y2023_rushyrds = sum(y2023_rushyrds)/len(y2023_rushyrds)
+    y2023_pass_td = sum(y2023_pass_td)/len(y2023_pass_td)
+    y2023_pass_yds = sum(y2023_pass_yds)/len(y2023_pass_yds)
+
+    #y2023_rushatt
+   # y2023_rushyrds
+   # y2023_rushtds 
+   # y2023_cmp 
+   # y2023_att 
+   # y2023_pass_td
+   # y2023_int 
+   # y2023_rating 
+   # y2023_pass_yds
 
     pass_val = passing_allowed - passing_average
     new_val = pass_val/passing_average 
@@ -2307,6 +2412,20 @@ def runQBProj(playerFirst, playerLast, pposition, oppTeam,oppTeamABR,loc, player
 
 
     print(allData)
+
+    print("Forecast pass yards: ", pyds)
+    print("Forecast pass tds: ", ptds)
+    print("Forecast rush yards: ", prds)
+    print("Forecast ints: ", pints)
+
+    print("forecast: ",pints.item() )
+    print("forecast: ", type(pints))
+
+    pass_yds_full = (pass_yds_full *0.8) + (y2023_pass_yds * 0.05) + (pyds.item() * 0.1)
+    pass_tds_full = (pass_tds_full *0.8) + (y2023_pass_td * 0.05) + (ptds.item() * 0.1)
+    rush_yds_full = (rush_yds_full*0.8) + (y2023_rushyrds * 0.05) + (prds.item() *0.1)
+
+     
 
     arr = [rush_att_full, rush_yds_full, rush_tds_full, att_full, cmp_full, int_full, pass_yds_full, pass_tds_full, rating_full ]
     

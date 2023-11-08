@@ -24,6 +24,8 @@ from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 
 sg.theme('BluePurple')
 
+
+
 # ---- Layout Section ----- #
 game_log =""
 playerName = ""
@@ -179,6 +181,7 @@ def linReg(X, Y):
     det = Sxx * N - Sx * Sx
     return (Sxy * N - Sy * Sx)/det, (Sxx * Sy - Sx * Sxy)/det
 
+
 # value for projection, yvalues, xvalues returns projection
 def linearRegPredict(predictVal, xval, yval):
 
@@ -238,13 +241,21 @@ def plotGraph(player_game_log, colname, ppos, loglast):
         else:
             df = loglast[['date','week','team','game_location','opp','result','team_pts','opp_pts','tgt','rec','rec_yds','rec_td','snap_pct']]
     elif ppos == "RB":
-        df = player_game_log[['date','week','team','game_location','opp','result','team_pts','opp_pts','rush_att','rush_yds','rush_td','tgt','rec_yds', 'rec_td']]
-        dflast = loglast[['date','week','team','game_location','opp','result','team_pts','opp_pts','rush_att','rush_yds','rush_td','tgt','rec_yds', 'rec_td']]
-        df = pd.concat([dflast, df], ignore_index=True)
+        if (len(loglast)> 0):
+            df = player_game_log[['date','week','team','game_location','opp','result','team_pts','opp_pts','rush_att','rush_yds','rush_td','tgt','rec_yds', 'rec_td']]
+            dflast = loglast[['date','week','team','game_location','opp','result','team_pts','opp_pts','rush_att','rush_yds','rush_td','tgt','rec_yds', 'rec_td']]
+            df = pd.concat([dflast, df], ignore_index=True)
+        else: 
+            df = player_game_log[['date','week','team','game_location','opp','result','team_pts','opp_pts','rush_att','rush_yds','rush_td','tgt','rec_yds', 'rec_td']]
     elif ppos == "QB":
-        df = player_game_log[['date','week','team','game_location','opp','result','team_pts','opp_pts','cmp', 'att', 'pass_yds', 'pass_td','int','rating','sacked','rush_att','rush_yds','rush_td']]
-        dflast = loglast[['date','week','team','game_location','opp','result','team_pts','opp_pts','cmp', 'att', 'pass_yds', 'pass_td','int','rating','sacked','rush_att','rush_yds','rush_td']]
-        df = pd.concat([dflast, df], ignore_index=True)
+        if loglast is None:
+            df = player_game_log[['date','week','team','game_location','opp','result','team_pts','opp_pts','cmp', 'att', 'pass_yds', 'pass_td','int','rating','sacked','rush_att','rush_yds','rush_td']]
+        if (len(loglast) > 0 ):
+            df = player_game_log[['date','week','team','game_location','opp','result','team_pts','opp_pts','cmp', 'att', 'pass_yds', 'pass_td','int','rating','sacked','rush_att','rush_yds','rush_td']]
+            dflast = loglast[['date','week','team','game_location','opp','result','team_pts','opp_pts','cmp', 'att', 'pass_yds', 'pass_td','int','rating','sacked','rush_att','rush_yds','rush_td']]
+            df = pd.concat([dflast, df], ignore_index=True)
+        else:
+            df = player_game_log[['date','week','team','game_location','opp','result','team_pts','opp_pts','cmp', 'att', 'pass_yds', 'pass_td','int','rating','sacked','rush_att','rush_yds','rush_td']]
             
     forecast_col = colname
     forecast_out = int(math.ceil(0.01 * len(df)))
@@ -291,7 +302,7 @@ def plotGraph(player_game_log, colname, ppos, loglast):
 #player_game_log = p.get_player_game_log(player = "David Njoku", position = "TE", season = 2022)
 #plotGraph(player_game_log, "rec_yds")
 #confidence interval function
-def mean_confidence_interval(data, confidence=0.80):
+def mean_confidence_interval(data, confidence=0.90):
     a = 1.0 * np.array(data)
     n = len(a)
     m, se = np.mean(a), scipy.stats.sem(a)
@@ -1055,8 +1066,6 @@ def runWRProj(playerFirst, playerLast, pposition, oppTeam,oppTeamABR,loc, player
 
     print(player_home_road)
     # ------ Load Opp Team Data for Model -------- #
-
-    tg.get_team_game_log(team = oppTeam, season = 2022)
     t.home_road(team = oppTeam, season = 2022, avg = True)
 
     opp_games = tg.get_team_game_log(team = oppTeam, season = 2022)
@@ -2466,7 +2475,6 @@ def runQBProj(playerFirst, playerLast, pposition, oppTeam,oppTeamABR,loc, player
         ]
     window.extend_layout(window, new_rows)
     window.refresh()
-
 
 # ----------- Create the 3 layouts this Window will display -----------
 layout1 = [[sg.Text('Model Next Game Stats')],

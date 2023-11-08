@@ -5,6 +5,7 @@
 - Uses pro_football_reference_web_scraper, numpy, sklearn, scipy
 - JSON File needs to be updated weekly with FPI Chance to Win
 - requires install of pro_football_reference_web_scraper, numpy, sklearn, scipy, PySimpleGUI
+- our sites more often than twenty requests in a minute.
 
 # Installation
 

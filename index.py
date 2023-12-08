@@ -234,12 +234,12 @@ def linearRegPredict(predictVal, xval, yval):
 def plotGraph(player_game_log, colname, ppos, loglast):
 
     if ppos == "WR" or ppos == "TE":
-        if (len(player_game_log) > 0):
+        if (len(loglast) > 0):
             df = player_game_log[['date','week','team','game_location','opp','result','team_pts','opp_pts','tgt','rec','rec_yds','rec_td','snap_pct']]
             dflast = loglast[['date','week','team','game_location','opp','result','team_pts','opp_pts','tgt','rec','rec_yds','rec_td','snap_pct']]
             df = pd.concat([dflast, df], ignore_index=True)
         else:
-            df = loglast[['date','week','team','game_location','opp','result','team_pts','opp_pts','tgt','rec','rec_yds','rec_td','snap_pct']]
+            df = player_game_log[['date','week','team','game_location','opp','result','team_pts','opp_pts','tgt','rec','rec_yds','rec_td','snap_pct']]
     elif ppos == "RB":
         if (len(loglast)> 0):
             df = player_game_log[['date','week','team','game_location','opp','result','team_pts','opp_pts','rush_att','rush_yds','rush_td','tgt','rec_yds', 'rec_td']]
@@ -1062,9 +1062,9 @@ def runWRProj(playerFirst, playerLast, pposition, oppTeam,oppTeamABR,loc, player
     else:
         playerName =playerfull
    # playerName = playerFirst + " " + playerLast
-    player_home_road = ps.home_road(player = playerName, position = pposition, season = 2022)
+    
 
-    print(player_home_road)
+    #print(player_home_road)
     # ------ Load Opp Team Data for Model -------- #
     t.home_road(team = oppTeam, season = 2022, avg = True)
 
@@ -1286,7 +1286,7 @@ def runWRProj(playerFirst, playerLast, pposition, oppTeam,oppTeamABR,loc, player
         },
     }
 
-    
+    player_home_road = ps.home_road(player = playerName, position = pposition, season = 2022)
     #snap count
     yvalues = range(len(recent_games_snap_pct))
     val = linReg(yvalues, recent_games_snap_pct)[0]

@@ -1,5 +1,10 @@
 # Football_Tracker
 
+# MODEL ACCURACY: 
+- Hitting at 65% for the season vs Betting Lines
+- Over 1000 picks vs lines 
+
+# INFO
 - Single File application/Script to project NFL next game player statistics based on Recent trends in different statistics 
 - Creates a Simple GUI program that delivers projections on NFL players stats
 - Uses pro_football_reference_web_scraper, numpy, sklearn, scipy
@@ -19,3 +24,4 @@
 
 # Run Code
 - python3 index.py
+

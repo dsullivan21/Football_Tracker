@@ -302,7 +302,7 @@ def plotGraph(player_game_log, colname, ppos, loglast):
 #player_game_log = p.get_player_game_log(player = "David Njoku", position = "TE", season = 2022)
 #plotGraph(player_game_log, "rec_yds")
 #confidence interval function
-def mean_confidence_interval(data, confidence=0.90):
+def mean_confidence_interval(data, confidence=0.8):
     a = 1.0 * np.array(data)
     n = len(a)
     m, se = np.mean(a), scipy.stats.sem(a)
@@ -327,7 +327,7 @@ def runRbProj(playerFirst, playerLast, pposition, oppTeam,oppTeamABR,loc, player
 
     # ------ Load Opp Team Data for Model -------- #
 
-    opp_games = tg.get_team_game_log(team = oppTeam, season = 2022)
+    opp_games = tg.get_team_game_log(team = oppTeam, season = 2023)
     opp_splits = t.home_road(team = oppTeam, season = 2022, avg = True)
 
     #Store Opposition Defense statistics 
@@ -376,7 +376,7 @@ def runRbProj(playerFirst, playerLast, pposition, oppTeam,oppTeamABR,loc, player
     log2023 = ""
     log2022 = ""
 
-    i = 2023
+    i = 2024
     #search through last 4 years data
     while (i >= 2019):
     
@@ -388,7 +388,7 @@ def runRbProj(playerFirst, playerLast, pposition, oppTeam,oppTeamABR,loc, player
             dfLive = False
 
         # ---- Get data from all games for recent games trend ---- #
-        if i == 2023 and dfLive == True:
+        if i == 2024 and dfLive == True:
             playerTeam = player_game_log.loc[0]['team']
             recent_games_rushatt.extend( player_game_log.loc[:,'rush_att'].values)
             recent_games_rushyrds.extend(player_game_log.loc[:,'rush_yds'].values)
@@ -397,7 +397,7 @@ def runRbProj(playerFirst, playerLast, pposition, oppTeam,oppTeamABR,loc, player
             recent_games_recyrds.extend(player_game_log.loc[:,'rec_yds'].values)
             recent_games_rectds.extend(player_game_log.loc[:,'rec_td'].values)
             log2023 = player_game_log
-        elif i == 2022 and dfLive == True:
+        elif i == 2023 and dfLive == True:
             recent_games_rushatt = player_game_log.loc[:,'rush_att'].values
             recent_games_rushyrds = player_game_log.loc[:,'rush_yds'].values
             recent_games_rushtds = player_game_log.loc[:,'rush_td'].values
@@ -994,8 +994,8 @@ def runRbProj(playerFirst, playerLast, pposition, oppTeam,oppTeamABR,loc, player
 
     print(allData)
     
-    rec_yds_full = (rec_yds_full * 0.8) + (precyds.item()*0.2)
-    rush_yds_full = (rush_yds_full * 0.8) + (prds.item()*0.2)
+    rec_yds_full = (rec_yds_full * 0.65) + (precyds.item()*0.35)
+    rush_yds_full = (rush_yds_full * 0.65) + (prds.item()*0.35)
 
     print("REc fore: ",precyds.item())
     print("Rush fore: ",prds.item())
@@ -1013,6 +1013,7 @@ def runRbProj(playerFirst, playerLast, pposition, oppTeam,oppTeamABR,loc, player
             'Rec Tds' : rec_tds_full
         }
     }
+    print(saveprojection)
 
     with open('data.json') as f:
         data = json.load(f)
@@ -1066,9 +1067,9 @@ def runWRProj(playerFirst, playerLast, pposition, oppTeam,oppTeamABR,loc, player
 
     #print(player_home_road)
     # ------ Load Opp Team Data for Model -------- #
-    t.home_road(team = oppTeam, season = 2022, avg = True)
+    t.home_road(team = oppTeam, season = 2023, avg = True)
 
-    opp_games = tg.get_team_game_log(team = oppTeam, season = 2022)
+    opp_games = tg.get_team_game_log(team = oppTeam, season = 2023)
     #opp_games2 = tg.get_team_game_log(team = oppTeam, season = 2023)
     opp_splits = t.home_road(team = oppTeam, season = 2022, avg = True)
 
@@ -1119,7 +1120,7 @@ def runWRProj(playerFirst, playerLast, pposition, oppTeam,oppTeamABR,loc, player
 
     dfLive = True
 
-    i = 2023
+    i = 2024
     forecast_pick = -1
     #search through last 4 years data
     while (i >= 2019):
@@ -1133,7 +1134,7 @@ def runWRProj(playerFirst, playerLast, pposition, oppTeam,oppTeamABR,loc, player
 
 
         # ---- Get data from all games for recent games trend ---- #
-        if i == 2023 and dfLive == True:
+        if i == 2024 and dfLive == True:
             playerTeam = player_game_log.loc[0]['team']
             recent_games_rec.extend(player_game_log.loc[:,'rec'].values)
             recent_games_snap_pct.extend(player_game_log.loc[:,'snap_pct'].values)
@@ -1141,7 +1142,7 @@ def runWRProj(playerFirst, playerLast, pposition, oppTeam,oppTeamABR,loc, player
             recent_games_recyrds.extend(player_game_log.loc[:,'rec_yds'].values)
             recent_games_rectds.extend(player_game_log.loc[:,'rec_td'].values)
             y2023log = player_game_log
-        elif i == 2022 and dfLive == True:
+        elif i == 2023 and dfLive == True:
             if playerTeam == "":
                 playerTeam = player_game_log.loc[0]['team']
             recent_games_rec.extend(player_game_log.loc[:,'rec'].values)
@@ -1778,10 +1779,10 @@ def runQBProj(playerFirst, playerLast, pposition, oppTeam,oppTeamABR,loc, player
 
     # ------ Load Opp Team Data for Model -------- #
 
-    tg.get_team_game_log(team = oppTeam, season = 2022)
-    t.home_road(team = oppTeam, season = 2022, avg = True)
+    tg.get_team_game_log(team = oppTeam, season = 2023)
+    t.home_road(team = oppTeam, season = 2023, avg = True)
 
-    opp_games = tg.get_team_game_log(team = oppTeam, season = 2022)
+    opp_games = tg.get_team_game_log(team = oppTeam, season = 2023)
     opp_splits = t.home_road(team = oppTeam, season = 2022, avg = True)
 
     #Store Opposition Defense statistics 
@@ -1855,7 +1856,7 @@ def runQBProj(playerFirst, playerLast, pposition, oppTeam,oppTeamABR,loc, player
     dfLive = True
     playerTeam = ""
 
-    i = 2023
+    i = 2024
     forecast_pick = -1
 
     #search through last 4 years data
@@ -1869,7 +1870,7 @@ def runQBProj(playerFirst, playerLast, pposition, oppTeam,oppTeamABR,loc, player
             dfLive = False
 
         # ---- Get data from all games for recent games trend ---- #
-        if i == 2023 and dfLive:
+        if i == 2024 and dfLive:
             playerTeam = player_game_log.loc[0]['team']
             y2023_rushatt = player_game_log.loc[:,'rush_att'].values
             y2023_rushyrds = player_game_log.loc[:,'rush_yds'].values
@@ -1883,7 +1884,7 @@ def runQBProj(playerFirst, playerLast, pposition, oppTeam,oppTeamABR,loc, player
             log2023 = player_game_log
             print(player_game_log)
 
-        elif i == 2022 and dfLive:
+        elif i == 2023 and dfLive:
             recent_games_rushatt.extend(player_game_log.loc[:,'rush_att'].values)
             recent_games_rushyrds.extend(player_game_log.loc[:,'rush_yds'].values)
             recent_games_rushtds.extend(player_game_log.loc[:,'rush_td'].values)
@@ -1922,7 +1923,7 @@ def runQBProj(playerFirst, playerLast, pposition, oppTeam,oppTeamABR,loc, player
 
         isGame = False
 
-        if loc == "Away" :
+        if loc == "Away" and i >= 2023:
         # gets data for previous years similar game if available 
             valRow = player_game_log[(player_game_log["game_location"] == "@") & (player_game_log["opp"] == oppTeamABR)]
             print(valRow)
@@ -1937,7 +1938,7 @@ def runQBProj(playerFirst, playerLast, pposition, oppTeam,oppTeamABR,loc, player
                 att = valRow.iloc[0]['att']
                 rating = valRow.iloc[0]['rating']
                 isGame = True
-        elif loc == "Home":
+        elif loc == "Home" and i >= 2023:
             valRow = player_game_log[(player_game_log["game_location"] != "@") & (player_game_log["opp"] == oppTeamABR)]
             print(valRow)
             if len(valRow.index) > 0:
@@ -2325,7 +2326,7 @@ def runQBProj(playerFirst, playerLast, pposition, oppTeam,oppTeamABR,loc, player
             "cmp": historical_cmp_proj,
             "int": historical_int_proj,
             "rating": historical_rating_proj,
-            "weight" : 0.35
+            "weight" : 0.4
             },
         }
     
@@ -2341,7 +2342,7 @@ def runQBProj(playerFirst, playerLast, pposition, oppTeam,oppTeamABR,loc, player
             "cmp": recent_games_cmp_proj,
             "int": recent_games_int_proj,
             "rating": recent_games_rating_proj,
-            "weight" : 0.5
+            "weight" : 0.6
             },
         }
     # ENDIF #
@@ -2430,9 +2431,9 @@ def runQBProj(playerFirst, playerLast, pposition, oppTeam,oppTeamABR,loc, player
     print("forecast: ",pints.item() )
     print("forecast: ", type(pints))
 
-    pass_yds_full = (pass_yds_full *0.8) + (y2023_pass_yds * 0.05) + (pyds.item() * 0.1)
-    pass_tds_full = (pass_tds_full *0.8) + (y2023_pass_td * 0.05) + (ptds.item() * 0.1)
-    rush_yds_full = (rush_yds_full*0.8) + (y2023_rushyrds * 0.05) + (prds.item() *0.1)
+    pass_yds_full = (pass_yds_full *0.5) + (y2023_pass_yds * 0.1) + (pyds.item() * 0.4)
+    pass_tds_full = (pass_tds_full *0.5) + (y2023_pass_td * 0.1) + (ptds.item() * 0.4)
+    rush_yds_full = (rush_yds_full*0.5) + (y2023_rushyrds * 0.1) + (prds.item() *0.4)
 
      
 
@@ -2455,6 +2456,8 @@ def runQBProj(playerFirst, playerLast, pposition, oppTeam,oppTeamABR,loc, player
             "pass tds": pass_tds_full
         }
     }
+
+    print("PROJECTIONS: ", saveprojection)
 
     all_projections.append(saveprojection)
 
